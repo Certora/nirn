@@ -88,7 +88,10 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
   uint128 public override priceAtLastFee;
 
   /** @dev Tightly packed token adapters encoded as (address,uint96). */
-  bytes32[] internal packedAdaptersAndWeights;
+  //bytes32[] internal packedAdaptersAndWeights;
+
+  IErc20Adapter[] internal adapters_;
+  uint256[] internal weights_;
 
   /** @dev ERC20 decimals */
   function decimals() external view override returns (uint8) {
@@ -103,25 +106,27 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     IErc20Adapter[] memory adapters,
     uint256[] memory weights
   ) {
-    (adapters, weights) = packedAdaptersAndWeights.unpackAdaptersAndWeights();
+    (adapters, weights) = (adapters_, weights_); // packedAdaptersAndWeights.unpackAdaptersAndWeights();
   }
 
   function setAdaptersAndWeights(IErc20Adapter[] memory adapters, uint256[] memory weights) internal {
-    emit AllocationsUpdated(adapters, weights);
+    //emit AllocationsUpdated(adapters, weights);
+    adapters_ = adapters;
+    weights_ = weights;
+    /*
     packedAdaptersAndWeights = AdapterHelper.packAdaptersAndWeights(
       adapters,
       weights
-    );
+    );*/
   }
 
-  function removeAdapters(uint256[] memory removeIndices) internal {
-    uint256 len = removeIndices.length;
+  function removeAdapters(uint256[] memory removeIndices, uint256 len) internal {
     if (len == 0) return;
     for (uint256 i = len; i > 0; i--) {
       uint256 rI = removeIndices[i - 1];
-      (IErc20Adapter adapter,) = packedAdaptersAndWeights[rI].unpackAdapterAndWeight();
+      IErc20Adapter adapter = adapters_[rI]; // packedAdaptersAndWeights[rI].unpackAdapterAndWeight();
       emit AdapterRemoved(adapter);
-      packedAdaptersAndWeights.remove(rI);
+      adapters_.remove(rI); weights_.remove(rI); //packedAdaptersAndWeights.remove(rI);
     }
   }
 
@@ -169,11 +174,11 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     rewardsSeller = IRewardsSeller(_rewardsSeller);
 
     (address adapter,) = registry.getAdapterWithHighestAPR(_underlying);
-    packedAdaptersAndWeights.push(AdapterHelper.packAdapterAndWeight(IErc20Adapter(adapter), 1e18));
+    adapters_.push(IErc20Adapter(adapter)); weights_.push(1e18); //packedAdaptersAndWeights.push(AdapterHelper.packAdapterAndWeight(IErc20Adapter(adapter), 1e18));
     beforeAddAdapter(IErc20Adapter(adapter));
 
-    name = SymbolHelper.getPrefixedName("Indexed ", _underlying);
-    symbol = SymbolHelper.getPrefixedSymbol("n", _underlying);
+    // name = SymbolHelper.getPrefixedName("Indexed ", _underlying);
+    // symbol = SymbolHelper.getPrefixedSymbol("n", _underlying);
     performanceFee = 1e17;
     reserveRatio = 1e17;
     priceAtLastFee = 1e18;
@@ -217,7 +222,7 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     require(!lockedTokens[rewardsToken] && rewardsToken != underlying, "token locked");
     IRewardsSeller _rewardsSeller = rewardsSeller;
     require(address(_rewardsSeller) != address(0), "null seller");
-    rewardsToken.safeTransfer(address(_rewardsSeller), _balance);
+    ERC20(rewardsToken).transfer(address(_rewardsSeller), _balance);
     _rewardsSeller.sellRewards(msg.sender, rewardsToken, underlying, params);
   }
 

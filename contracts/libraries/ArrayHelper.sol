@@ -44,7 +44,7 @@ library ArrayHelper {
 /* ========== Removal ========== */
 
   /**
-   * @dev Remove the element at `index` from an array and decrement its length.
+   * @dev Remove the element at `index` from an array and CER: ~decrement its length~.
    * If `index` is the last index in the array, pops it from the array.
    * Otherwise, stores the last element in the array at `index` and then pops the last element.
    */
@@ -54,11 +54,10 @@ library ArrayHelper {
       uint256 last = arr[len - 1];
       arr[index] = last;
     }
-    assembly { mstore(arr, sub(len, 1)) }
   }
 
   /**
-   * @dev Remove the element at `index` from an array and decrement its length.
+   * @dev Remove the element at `index` from an array and CER: ~decrement its length~.
    * If `index` is the last index in the array, pops it from the array.
    * Otherwise, stores the last element in the array at `index` and then pops the last element.
    */
@@ -68,11 +67,10 @@ library ArrayHelper {
       address last = arr[len - 1];
       arr[index] = last;
     }
-    assembly { mstore(arr, sub(len, 1)) }
   }
 
   /**
-   * @dev Remove the element at `index` from an array and decrement its length.
+   * @dev Remove the element at `index` from an array and CER: ~decrement its length~.
    * If `index` is the last index in the array, pops it from the array.
    * Otherwise, stores the last element in the array at `index` and then pops the last element.
    */
@@ -82,7 +80,6 @@ library ArrayHelper {
       IErc20Adapter last = arr[len - 1];
       arr[index] = last;
     }
-    assembly { mstore(arr, sub(len, 1)) }
   }
 
   /**
@@ -117,6 +114,28 @@ library ArrayHelper {
     arr.pop();
   }
 
+  function remove(IErc20Adapter[] storage arr, uint256 index) internal {
+    uint256 len = arr.length;
+    if (index == len - 1) {
+      arr.pop();
+      return;
+    }
+    IErc20Adapter last = arr[len - 1];
+    arr[index] = last;
+    arr.pop();
+  }
+
+  function remove(uint[] storage arr, uint256 index) internal {
+    uint256 len = arr.length;
+    if (index == len - 1) {
+      arr.pop();
+      return;
+    }
+    uint last = arr[len - 1];
+    arr[index] = last;
+    arr.pop();
+  }
+  
 /* ========== Search ========== */
 
   /**
