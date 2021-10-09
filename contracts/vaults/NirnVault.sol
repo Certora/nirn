@@ -13,7 +13,7 @@ import "./NirnVaultBase.sol";
  * In addition, avoiding packing functions and using pure Solidity.
  * Need to spec those array functions separately to keep business logic spec simple and easy to verify.
  *
- * Also changing safeTransfer* functions to transfer*. This allows running the tool in an easier mode.
+ * Also changing safeTransfer* (safeApprove tool) functions to transfer*. This allows running the tool in an easier mode.
  */
 contract NirnVault is NirnVaultBase {
   using Fraction for uint256;
