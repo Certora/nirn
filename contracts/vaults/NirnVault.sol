@@ -235,7 +235,7 @@ contract NirnVault is NirnVaultBase {
     params.balances = new uint256[](expandedSize);
     params.liquidityDeltas = new int256[](expandedSize);
     uint256 i;
-    uint256 netAPR;
+    uint256 netAPR;/*
     for (; i < proposedAdapters.length; i++) { // CER: had to get rid of proposedSize to avoid a stack too deep error that even optimizer couldn't help against
       IErc20Adapter adapter = proposedAdapters[i];
       params.adapters[i] = adapter;
@@ -265,7 +265,7 @@ contract NirnVault is NirnVaultBase {
       uint256 _balance = currentParams.balances[rI];
       params.balances[i] = _balance;
       params.liquidityDeltas[i] = -_balance.toInt256();
-    }
+    }*/
   }
 
   function rebalanceWithNewAdapters(

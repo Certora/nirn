@@ -234,10 +234,10 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     );
     require(registry.isApprovedAdapter(address(adapter)), "!approved");
     address wrapper = adapter.token();
-    wrapper.safeApproveMax(address(adapter));
+    ERC20(wrapper).approve(address(adapter), type(uint256).max); //.safeApproveMax(address(adapter));
     uint256 bal = adapter.balanceUnderlying();
     adapter.withdrawUnderlyingUpTo(bal);
-    wrapper.safeUnapprove(address(adapter));
+    ERC20(wrapper).approve(address(adapter), 0); //safeUnapprove(address(adapter));
   }
 
 /* ========== Underlying Balance Queries ========== */
@@ -336,8 +336,8 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     address wrapper = adapter.token();
     if (IERC20(wrapper).allowance(address(this), address(adapter)) > 0) return;
     lockedTokens[wrapper] = true;
-    underlying.safeApproveMax(address(adapter));
-    wrapper.safeApproveMax(address(adapter));
+    ERC20(underlying).approve(address(adapter), type(uint256).max); //.safeApproveMax(address(adapter));
+    ERC20(wrapper).approve(address(adapter), type(uint256).max); //.safeApproveMax(address(adapter));
   }
 
   function beforeAddAdapters(IErc20Adapter[] memory adapters) internal {
