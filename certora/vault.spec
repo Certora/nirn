@@ -123,8 +123,23 @@ rule no_double_fee() {    // TODO
 
 // deposit x and deposit y is the same as deposit x+ y
 // see potential issues 
-rule additive_deposit() { // TODO
-    assert false, "not yet implemented";
+rule additive_deposit(uint256 x, uint256 y) { // TODO
+    env e;
+
+    // store state
+    storage initStorage = lastStorage;
+
+    deposit(x);
+    deposit(y);
+    uint256 balance_sequential = balance();
+    
+
+    // return to storage state
+    
+    deposit(x + y) at initStorage;
+    uint256 balance_additive = balance();
+
+    assert balance_sequential == balance_additive, "additivity failed";
 }
 // might as well write this to go with additive deposit
 rule additive_withdraw() { // TODO
