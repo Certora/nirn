@@ -5,3 +5,6 @@ typechain/
 .env
 coverage/
 coverage.json
+.certora_build.json
+.certora*
+last_conf*

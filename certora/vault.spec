@@ -50,7 +50,8 @@ methods {
     // withdrawFromUnusedAdapter(IErc20Adapter)
     // getBalanceSheet(IErc20Adapter[])
     getBalances() returns (uint256[])
-    balance() returns (uint256)
+    balance() returns (uint256) envfree
+    totalSupply() returns uint256 envfree
     reserveBalance() returns (uint256)
     // calculateFee(uint256, uint256) // internal
     getPendingFees() returns (uint256)
@@ -63,6 +64,13 @@ methods {
 
     // harness
     adaptersLength() returns uint envfree
+
+
+    // adapter
+    //TODO - need a symbolic adapter
+    balanceUnderlying() => CONSTANT
+
+    
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -90,7 +98,7 @@ invariant rebalance_safety() // TODO
 //  total_supply > 0 <=> balance() > 0 
 // see potential issues 
 invariant total_supply_vs_balance() // TODO
-    false
+    totalSupply() > 0 <=> balance() >0 
 
 // each vault maps to an underlying (for underlying that apply?)
 invariant vault_underlying_mapping() // TODO
