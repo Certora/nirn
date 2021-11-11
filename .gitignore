@@ -8,3 +8,6 @@ coverage.json
 .certora_build.json
 .certora*
 last_conf*
+.DS_Store
+package-lock.json
+package.json
