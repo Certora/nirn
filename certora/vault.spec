@@ -70,6 +70,8 @@ methods {
     //TODO - need a symbolic adapter
     balanceUnderlying() => CONSTANT
 
+    // helpers
+    checkRemoveAdapters(uint256[], uint256 ) envfree
     
 }
 
@@ -144,6 +146,16 @@ rule whitelist_adapter_only() { // TODO
     assert false, "not yet implemented";
 }
 
+rule validity_removeAdapters() {
+    uint256[] toRemove;
+    uint256 len = 2;
+    require toRemove.length == 2; 
+    require adaptersLength() == 4;
+    require toRemove[0] <= adaptersLength()-1;
+    require toRemove[1] <= adaptersLength()-1;
+    invoke checkRemoveAdapters(toRemove, len);
+    assert !lastReverted;
+}
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////

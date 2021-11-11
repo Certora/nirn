@@ -13,8 +13,8 @@ shift 1
 
 certoraRun contracts/vaults/NirnVault.sol certora/harness/DummyERC20Impl.sol certora/harness/SymbolicERC20Adapter.sol \
     --verify NirnVault:certora/vault.spec \
-    --optimistic_loop --loop_iter 1 \
-    --settings -copyLoopUnroll=1,-depth=1,-t=60 \
+    --optimistic_loop --loop_iter 3 \
+    --settings -copyLoopUnroll=1,-depth=1,-t=600,-postProcessCounterExamples=true \
     --msg "indexed vault ${msg}" \
     --link NirnVault:underlying=DummyERC20Impl \
     --solc solc7.6 \
