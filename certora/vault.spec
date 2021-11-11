@@ -64,7 +64,8 @@ methods {
 
     // harness
     adaptersLength() returns uint envfree
-
+    weightsLength() returns uint envfree
+    getAdapter(uint256) returns address envfree
 
     // adapter
     //TODO - need a symbolic adapter
@@ -72,9 +73,12 @@ methods {
 
     // helpers
     checkRemoveAdapters(uint256[], uint256 ) envfree
-    
+
+    // isApprovedAdapter(address adapter) returns bool envfree
+    isApprovedAdapter(address adapter) => symbolic_approver(adapter)
 }
 
+ghost symbolic_approver(address) returns bool;
 ////////////////////////////////////////////////////////////////////////////
 //                       Invariants                                       //
 ////////////////////////////////////////////////////////////////////////////
@@ -161,4 +165,14 @@ rule validity_removeAdapters() {
 ////////////////////////////////////////////////////////////////////////////
 
 // TODO: Any additional helper functions
+
+    invariant adapter_length_eq_weight()
+    adaptersLength() == weightsLength()
+
+    invariant adapters_are_unique(uint256 i, uint256 j)
+    i != j => getAdapter(i) != getAdapter(j)
+
+    invariant isApprovedAdapter(address adapter, env e)
+    isApprovedAdapterInRegistry(e,adapter)
+    // filtered{f -> f.selector != isApprovedAdapter_instate.selector }
 
