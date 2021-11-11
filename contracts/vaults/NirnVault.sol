@@ -2,7 +2,7 @@
 pragma solidity =0.7.6;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "node_modules/@openzeppelin/contracts/access/Ownable.sol";
 import "../libraries/RebalanceValidation.sol";
 import "../libraries/SafeCast.sol";
 import "./NirnVaultBase.sol";
@@ -318,4 +318,13 @@ contract NirnVault is NirnVaultBase {
   function weightsLength() external view returns (uint256) { return weights_.length; }
 
   function getWeight(uint i) external view returns (uint256) { return weights_[i]; }
+
+  function getAdapter(uint256 i) external returns(address) {
+  require( i < adapters_.length);
+  return address(adapters_[i]);
+  }
+
+  function isApprovedAdapterInRegistry(address adapter) external returns (bool){
+    return registry.isApprovedAdapter(address(adapter));
+  }
 }
