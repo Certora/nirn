@@ -74,6 +74,7 @@ methods {
 
     // helpers
     checkRemoveAdapters(uint256[], uint256 ) envfree
+    getBalanceSheetTotalBalance() returns (uint256) envfree
 
     // isApprovedAdapter(address adapter) returns bool envfree
     isApprovedAdapter(address adapter) => symbolic_approver(adapter)
@@ -116,6 +117,8 @@ invariant vault_underlying_mapping() // TODO
 invariant underlying_single_vault() // TODO
     false
 
+invariant balanceSheet_equals_balance() // Passing
+    balance() == getBalanceSheetTotalBalance()
 
 
 
