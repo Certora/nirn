@@ -48,7 +48,7 @@ methods {
     setReserveRatio(uint64)
     setFeeRecipient(address)
     // setRewardsSeller(IRewardsSeller)
-    sellRewards(address, bytes)
+    sellRewards(address, bytes) => NONDET
     // withdrawFromUnusedAdapter(IErc20Adapter)
     // getBalanceSheet(IErc20Adapter[])
     getBalances() returns (uint256[])
@@ -108,6 +108,17 @@ invariant rebalance_safety() // TODO
 // see potential issues 
 invariant total_supply_vs_balance() // TODO
     totalSupply() == 0 <=> balance() == 0 
+{
+    preserved withdraw(uint256 amount) with (env e){
+        require e.msg.sender != currentContract;
+    }
+    preserved withdrawFromUnusedAdapter(address adapter) with (env e){
+        require e.msg.sender != currentContract;
+    }
+    preserved withdrawUnderlying(uint256 amount) with (env e){
+        require e.msg.sender != currentContract;
+    }
+}
 
 // each vault maps to an underlying (for underlying that apply?)
 invariant vault_underlying_mapping() // TODO
@@ -220,10 +231,12 @@ rule validity_removeAdapters() {
     // invariant reserveBalance_GE_20(env e)
     // reserveBalance(e) * 5 <= balance()
 
-    rule deposit_GR_zero(method f){
+    rule deposit_GR_zero(){
         env e;
         require e.msg.sender != currentContract;
         require maximumUnderlying(e) > 0;
+
+        // require totalSupply() > 0;
 
         uint256 amount;
         uint256 amountMinted = deposit(e,amount);
