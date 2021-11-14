@@ -21,6 +21,7 @@ methods {
     withdrawAll() => DISPATCHER(true)
     withdrawUnderlying(uint256) => DISPATCHER(true)
     withdrawUnderlyingUpTo(uint256) => DISPATCHER(true)
+    availableLiquidity() => DISPATCHER(true)
 
     // Vault functions
     getCurrentLiquidityDeltas() returns (int256[])
@@ -66,7 +67,6 @@ methods {
     adaptersLength() returns uint envfree
     weightsLength() returns uint envfree
     getAdapter(uint256) returns address envfree
-
     // adapter
     //TODO - need a symbolic adapter
     balanceUnderlying() => CONSTANT
@@ -104,7 +104,7 @@ invariant rebalance_safety() // TODO
 //  total_supply > 0 <=> balance() > 0 
 // see potential issues 
 invariant total_supply_vs_balance() // TODO
-    totalSupply() > 0 <=> balance() >0 
+    totalSupply() == 0 <=> balance() == 0 
 
 // each vault maps to an underlying (for underlying that apply?)
 invariant vault_underlying_mapping() // TODO
@@ -176,3 +176,21 @@ rule validity_removeAdapters() {
     isApprovedAdapterInRegistry(e,adapter)
     // filtered{f -> f.selector != isApprovedAdapter_instate.selector }
 
+    
+    invariant adapters_lenght_ge_2()
+    adaptersLength() >= 2
+
+    
+    // invariant reserveBalance_GE_20(env e)
+    // reserveBalance(e) * 5 <= balance()
+
+    rule deposit_GR_zero(method f){
+        env e;
+        require e.msg.sender != currentContract;
+        require maximumUnderlying(e) > 0;
+
+        uint256 amount;
+        uint256 amountMinted = deposit(e,amount);
+
+        assert amount > 0 <=> amountMinted > 0;
+    }
