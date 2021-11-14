@@ -95,6 +95,12 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
 
   function adaptersLength() external view returns (uint256) { return adapters_.length; }
 
+  // harness function
+  function getBalanceSheetTotalBalance() external view returns (uint256) { 
+    (IErc20Adapter[] memory adapters, uint256[] memory weights) = getAdaptersAndWeights();
+    return getBalanceSheet(adapters).totalBalance; 
+  }
+
   /** @dev ERC20 decimals */
   function decimals() external view override returns (uint8) {
     try IERC20Metadata(underlying).decimals() returns (uint8 _decimals) {

@@ -24,6 +24,7 @@ methods {
     availableLiquidity() => DISPATCHER(true)
 
     // Vault functions
+    deposit(uint256) returns (uint256)
     getCurrentLiquidityDeltas() returns (int256[])
     getAPR() returns (uint256)
     depositTo(uint256, address) returns (uint256)
@@ -73,6 +74,7 @@ methods {
 
     // helpers
     checkRemoveAdapters(uint256[], uint256 ) envfree
+    getBalanceSheetTotalBalance() returns (uint256) envfree
 
     // isApprovedAdapter(address adapter) returns bool envfree
     isApprovedAdapter(address adapter) => symbolic_approver(adapter)
@@ -90,6 +92,7 @@ ghost symbolic_approver(address) returns bool;
 // t(w) = v(p) * w
 invariant target_balance_accurate() // TODO
     false
+
 // Weights always above minimum values (they list this in the WP as a pre-requisite for rebalance)
 // Section 3.3, point 5 of the WP
 invariant min_weights() // TODO
@@ -110,10 +113,12 @@ invariant total_supply_vs_balance() // TODO
 invariant vault_underlying_mapping() // TODO
     false
 
-// mo underlying can map to more than one vault
+// no underlying can map to more than one vault
 invariant underlying_single_vault() // TODO
     false
 
+invariant balanceSheet_equals_balance() // Passing
+    balance() == getBalanceSheetTotalBalance()
 
 
 
@@ -137,12 +142,43 @@ rule no_double_fee() {    // TODO
 
 // deposit x and deposit y is the same as deposit x+ y
 // see potential issues 
-rule additive_deposit() { // TODO
-    assert false, "not yet implemented";
+rule additive_deposit(uint256 x, uint256 y) { // Timing out
+    env e;
+
+    // store state
+    storage initStorage = lastStorage;
+
+    uint256 shares_x = deposit(e, x);
+    uint256 shares_y = deposit(e, y);
+    uint256 balance_sequential = balance();
+    
+
+    // return to storage state
+    
+    uint256 shares_xy = deposit(e, x + y) at initStorage;
+    uint256 balance_additive = balance();
+
+    assert balance_sequential == balance_additive, "additivity of balance failed";
+    assert shares_x + shares_y == shares_xy, "additivity of shares failed";
 }
 // might as well write this to go with additive deposit
-rule additive_withdraw() { // TODO
-    assert false, "not yet implemented";
+rule additive_withdraw(uint256 x, uint256 y) { // TODO
+    env e;
+
+    // store state
+
+    storage initStorage = lastStorage;
+    uint256 x_out = withdraw(e, x);
+    uint256 y_out = withdraw(e, y);
+    uint256 balance_sequential = balance();
+    
+
+    // return to storage state
+    uint256 xy_out = withdraw(e, x + y) at initStorage;
+    uint256 balance_additive = balance();
+
+    assert balance_sequential == balance_additive, "additivity of balance failed";
+    assert x_out + y_out == xy_out, "additivity of output failed";
 }
 
 // only whitelisted adapters can be used
