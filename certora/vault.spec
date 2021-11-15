@@ -21,6 +21,7 @@ methods {
     withdrawAll() => DISPATCHER(true)
     withdrawUnderlying(uint256) => DISPATCHER(true)
     withdrawUnderlyingUpTo(uint256) => DISPATCHER(true)
+    availableLiquidity() => DISPATCHER(true)
 
     // Vault functions
     deposit(uint256) returns (uint256)
@@ -49,7 +50,7 @@ methods {
     setReserveRatio(uint64)
     setFeeRecipient(address)
     // setRewardsSeller(IRewardsSeller)
-    sellRewards(address, bytes)
+    sellRewards(address, bytes) => NONDET
     // withdrawFromUnusedAdapter(IErc20Adapter)
     // getBalanceSheet(IErc20Adapter[])
     getBalances() returns (uint256[])
@@ -69,7 +70,6 @@ methods {
     adaptersLength() returns uint envfree
     weightsLength() returns uint envfree
     getAdapter(uint256) returns address envfree
-
     // adapter
     //TODO - need a symbolic adapter
     balanceUnderlying() => CONSTANT
@@ -109,7 +109,18 @@ invariant rebalance_safety() // TODO
 //  total_supply > 0 <=> balance() > 0 
 // see potential issues 
 invariant total_supply_vs_balance() // TODO
-    totalSupply() > 0 <=> balance() >0 
+    totalSupply() == 0 <=> balance() == 0 
+{
+    preserved withdraw(uint256 amount) with (env e){
+        require e.msg.sender != currentContract;
+    }
+    preserved withdrawFromUnusedAdapter(address adapter) with (env e){
+        require e.msg.sender != currentContract;
+    }
+    preserved withdrawUnderlying(uint256 amount) with (env e){
+        require e.msg.sender != currentContract;
+    }
+}
 
 // each vault maps to an underlying (for underlying that apply?)
 invariant vault_underlying_mapping() // TODO
@@ -215,3 +226,23 @@ rule validity_removeAdapters() {
     isApprovedAdapterInRegistry(e,adapter)
     // filtered{f -> f.selector != isApprovedAdapter_instate.selector }
 
+    
+    invariant adapters_lenght_ge_2()
+    adaptersLength() >= 2
+
+    
+    // invariant reserveBalance_GE_20(env e)
+    // reserveBalance(e) * 5 <= balance()
+
+    rule deposit_GR_zero(){
+        env e;
+        require e.msg.sender != currentContract;
+        require maximumUnderlying(e) > 0;
+
+        // require totalSupply() > 0;
+
+        uint256 amount;
+        uint256 amountMinted = deposit(e,amount);
+
+        assert amount > 0 <=> amountMinted > 0;
+    }
