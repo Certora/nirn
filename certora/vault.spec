@@ -24,6 +24,8 @@ methods {
 
     // Vault functions
     deposit(uint256) returns (uint256)
+    withdraw(uint256) returns (uint256)
+    
     getCurrentLiquidityDeltas() returns (int256[])
     getAPR() returns (uint256)
     depositTo(uint256, address) returns (uint256)
@@ -142,8 +144,9 @@ rule no_double_fee() {    // TODO
 
 // deposit x and deposit y is the same as deposit x+ y
 // see potential issues 
-rule additive_deposit(uint256 x, uint256 y) { // Timing out
+rule additive_deposit() { // Timing out
     env e;
+    uint256 x; uint256 y;
 
     // store state
     storage initStorage = lastStorage;
@@ -162,9 +165,9 @@ rule additive_deposit(uint256 x, uint256 y) { // Timing out
     assert shares_x + shares_y == shares_xy, "additivity of shares failed";
 }
 // might as well write this to go with additive deposit
-rule additive_withdraw(uint256 x, uint256 y) { // TODO
+rule additive_withdraw() { // TODO
     env e;
-
+    uint256 x; uint256 y;
     // store state
 
     storage initStorage = lastStorage;
