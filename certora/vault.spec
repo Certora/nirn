@@ -5,6 +5,9 @@
 
 import "helpers/erc20.spec"
 
+using DummyERC20Impl as underlyingToken
+using SymbolicERC20Adapter as Adapter
+
 // TODO: harness internal functions (is this change still coming soon?)
 // TODO: add support for the IErc20Adapter (if needed)
 // TODO: add support for "DistributionParameters" (if needed)
@@ -47,8 +50,12 @@ methods {
     setPerformanceFee(uint64)
     setReserveRatio(uint64)
     setFeeRecipient(address)
+    feeRecipient() returns (address) envfree
+    priceAtLastFee() returns (uint128) envfree
+    claimFees() envfree
     // setRewardsSeller(IRewardsSeller)
-    sellRewards(address, bytes) => NONDET
+    sellRewards(address, bytes) => DISPATCHER(true)
+    //0x00e00ebb => NONDET
     // withdrawFromUnusedAdapter(IErc20Adapter)
     // getBalanceSheet(IErc20Adapter[])
     getBalances() returns (uint256[])
@@ -60,6 +67,9 @@ methods {
     // claimFees(uint256, uint256) returns (uint256) // internal
     getPricePerFullShare() returns (uint256)
     getPricePerFullShareWithFee() returns (uint256)
+
+    balanceOf(address) returns(uint256) envfree
+    
     // beforeAddAdapter(IErc20Adapter)
     // beforeAddAdapters(IErc20Adapter[])
     // external method summaries
@@ -104,19 +114,31 @@ invariant rebalance_safety() // TODO
 
 
 
-//  total_supply > 0 <=> balance() > 0 
-// see potential issues 
 invariant total_supply_vs_balance() // TODO
     totalSupply() == 0 <=> balance() == 0 
 {
     preserved withdraw(uint256 amount) with (env e){
-        require e.msg.sender != currentContract;
+        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
     }
     preserved withdrawFromUnusedAdapter(address adapter) with (env e){
-        require e.msg.sender != currentContract;
+        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
     }
     preserved withdrawUnderlying(uint256 amount) with (env e){
-        require e.msg.sender != currentContract;
+        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+    }
+}
+
+invariant balance_GE_totalSupply() // TODO
+    balance() >= totalSupply()
+{
+    preserved withdraw(uint256 amount) with (env e){
+        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+    }
+    preserved withdrawFromUnusedAdapter(address adapter) with (env e){
+        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+    }
+    preserved withdrawUnderlying(uint256 amount) with (env e){
+        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
     }
 }
 
@@ -236,10 +258,55 @@ rule validity_removeAdapters() {
         require e.msg.sender != currentContract;
         require maximumUnderlying(e) > 0;
 
-        // require totalSupply() > 0;
-
         uint256 amount;
         uint256 amountMinted = deposit(e,amount);
 
         assert amount > 0 <=> amountMinted > 0;
     }
+
+    rule more_shares_more_withdraw(){
+        env e;
+
+        uint256 sharesX;
+        uint256 sharesY;
+        uint256 amountX;
+        uint256 amountY;
+
+        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+        require sharesX <= balanceOf(e.msg.sender);
+
+        storage init = lastStorage;
+
+        amountX =  withdraw(e,sharesX);
+        amountY =  withdraw(e,sharesY) at init;
+
+        assert sharesX > sharesY => amountX >= amountY;
+    }
+    rule more_user_shares_less_contract_underlying(){
+        env e;
+
+        uint256 sharesX;
+        uint256 amountX;
+
+        uint256 Underlying_balance_before = underlyingToken.balanceOf(e,currentContract);
+        uint256 User_balance_before = balanceOf(e.msg.sender);
+
+
+
+        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+        // require sharesX <= User_balance_before;
+
+        amountX =  withdraw(e,sharesX);
+     
+        uint256 Underlying_balance_after = underlyingToken.balanceOf(e,currentContract);
+        uint256 User_balance_after = balanceOf(e.msg.sender);
+
+        assert User_balance_after > User_balance_before => Underlying_balance_after < Underlying_balance_before;
+    }
+
+    rule price_monotonicity(){
+    uint price = priceAtLastFee();
+    claimFees();
+    assert priceAtLastFee() >= price;
+    }
+    
