@@ -74,7 +74,7 @@ contract SymbolicERC20Adapter {
 
   function _withdraw(uint256 amountToken) private returns (uint256 amountReceived) {
       amountReceived = amountToUnderlying[exchangeMapIdx++][amountToken];
-      IERC20(_underlying).transferFrom(msg.sender, address(this), amountReceived);
+      IERC20(_underlying).transfer(msg.sender, amountReceived);
       if (doesSelfTrack) {
           mintTracking[msg.sender] = mintTracking[msg.sender].sub(amountToken);
       }
