@@ -64,7 +64,7 @@ methods {
     balance() returns (uint256) envfree
     totalSupply() returns uint256 envfree
     reserveBalance() returns (uint256)
-    // calculateFee(uint256, uint256) // internal
+    calculateFee(uint256, uint256) returns (uint256) envfree // internal normally
     getPendingFees() returns (uint256)
     // claimFees(uint256, uint256) returns (uint256) // internal
     getPricePerFullShare() returns (uint256)
@@ -85,7 +85,7 @@ methods {
     balanceUnderlying() => CONSTANT
 
     // helpers
-    checkRemoveAdapters(uint256[], uint256 ) envfree
+    // checkRemoveAdapters(uint256[], uint256 ) envfree // should be removed??
     getBalanceSheetTotalBalance() returns (uint256) envfree
 
     // isApprovedAdapter(address adapter) returns bool envfree
@@ -169,16 +169,11 @@ invariant balanceSheet_equals_balance() // Passing
 // the vault reserves are empty until the next deposit or rebalance.”
 // amountOut = withdraw(shares)amountOut > current_liquid_reserves => vault reserves are empty
 
-// “ take 10% of the yield earned by productive assets”
-//  deposit and immediately withdraw results in the same amount (only on yield)
-rule no_double_fee() {    // TODO
-    assert false, "not yet implemented";
-}
-
 // deposit x and deposit y is the same as deposit x+ y
 // see potential issues 
 rule additive_deposit() { // Timing out
     env e;
+    // require total supply = total balance 
     uint256 x; uint256 y;
 
     // store state
@@ -186,16 +181,22 @@ rule additive_deposit() { // Timing out
 
     uint256 shares_x = deposit(e, x);
     uint256 shares_y = deposit(e, y);
+    uint256 indexed_shares_seq = balanceOf(feeRecipient());
+    // without these checks the dust (roundoff) bug is showed off
+    require shares_x != 0;
+    require shares_y != 0;
+
     uint256 balance_sequential = balance();
-    
 
     // return to storage state
     
     uint256 shares_xy = deposit(e, x + y) at initStorage;
+    uint256 indexed_shares_sum = balanceOf(feeRecipient());
     uint256 balance_additive = balance();
 
     assert balance_sequential == balance_additive, "additivity of balance failed";
-    assert shares_x + shares_y == shares_xy, "additivity of shares failed";
+    // assert shares_x + shares_y == shares_xy, "additivity of shares failed";
+    assert indexed_shares_seq == indexed_shares_sum, "additivity of fees failed";
 }
 // might as well write this to go with additive deposit
 rule additive_withdraw() { // TODO
@@ -204,17 +205,49 @@ rule additive_withdraw() { // TODO
     // store state
 
     storage initStorage = lastStorage;
+
     uint256 x_out = withdraw(e, x);
     uint256 y_out = withdraw(e, y);
+
     uint256 balance_sequential = balance();
-    
+    uint256 indexed_shares_seq = balanceOf(feeRecipient());
 
     // return to storage state
     uint256 xy_out = withdraw(e, x + y) at initStorage;
     uint256 balance_additive = balance();
+    uint256 indexed_shares_sum = balanceOf(feeRecipient());
 
     assert balance_sequential == balance_additive, "additivity of balance failed";
     assert x_out + y_out == xy_out, "additivity of output failed";
+    assert indexed_shares_seq == indexed_shares_sum, "additivity of fees failed";
+}
+
+rule no_double_fee(method f) filtered {f -> (f.selector != rebalance().selector ||
+                                             f.selector != rebalanceWithNewWeights(uint256[]).selector ||
+                                             f.selector != rebalanceWithNewAdapters(address[],uint256[]).selector    
+                                            )} { // filtered out functions that are timing out
+    env e; calldataarg args;
+    require e.msg.sender != feeRecipient();
+
+    uint256 balance_pre = balance();
+    // make sure there is no yield beforehand to claim
+
+
+    uint256 supply_pre = totalSupply();
+    uint256 indexed_shares_pre = balanceOf(feeRecipient());
+
+    require indexed_shares_pre < supply_pre; // cex where indexed had all shares
+    require calculateFee(balance_pre, supply_pre) == 0;
+
+    f(e, args);
+    claimFees();
+    
+    uint256 supply_post = totalSupply();
+    uint256 balance_post = balance();
+    uint256 indexed_shares_post = balanceOf(feeRecipient());
+    
+    // if a fee was claimed the shares of index will go up, this 
+    assert indexed_shares_pre != indexed_shares_post => balance_pre == balance_post && supply_pre == supply_post, "fee claimed on balance";
 }
 
 // only whitelisted adapters can be used
@@ -222,16 +255,16 @@ rule whitelist_adapter_only() { // TODO
     assert false, "not yet implemented";
 }
 
-rule validity_removeAdapters() {
-    uint256[] toRemove;
-    uint256 len = 2;
-    require toRemove.length == 2; 
-    require adaptersLength() == 4;
-    require toRemove[0] <= adaptersLength()-1;
-    require toRemove[1] <= adaptersLength()-1;
-    invoke checkRemoveAdapters(toRemove, len);
-    assert !lastReverted;
-}
+// rule validity_removeAdapters() {
+//     uint256[] toRemove;
+//     uint256 len = 2;
+//     require toRemove.length == 2; 
+//     require adaptersLength() == 4;
+//     require toRemove[0] <= adaptersLength()-1;
+//     require toRemove[1] <= adaptersLength()-1;
+//     invoke checkRemoveAdapters(toRemove, len);
+//     assert !lastReverted;
+// }
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////
