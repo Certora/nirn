@@ -67,6 +67,7 @@ contract NirnVault is NirnVaultBase {
     ERC20(underlying).transferFrom(msg.sender, address(this), amount);
     uint256 supply = claimFees(bal, totalSupply);
     shares = supply == 0 ? amount : amount.mul(supply) / bal;
+    // require (shares != 0 && to == msg.sender); // Gadi
     _mint(to, shares);
     emit Deposit(shares, amount);
   }
@@ -75,6 +76,7 @@ contract NirnVault is NirnVaultBase {
     (IErc20Adapter[] memory adapters, uint256[] memory weights) = getAdaptersAndWeights();
     BalanceSheet memory balanceSheet = getBalanceSheet(adapters);
     uint256 supply = claimFees(balanceSheet.totalBalance, totalSupply);
+    // require( balanceSheet.totalBalance >= totalSupply); Gadi
     amountOut = shares.mul(balanceSheet.totalBalance) / supply;
     withdrawInternal(
       shares,
@@ -311,6 +313,10 @@ contract NirnVault is NirnVaultBase {
 
 
   // certora helpers 
+  function checkRemoveAdapters(uint256[] memory removedIndices, uint256 len) public {
+    removeAdapters(removedIndices, len);
+  }
+
   function weightsLength() external view returns (uint256) { return weights_.length; }
 
   function getWeight(uint i) external view returns (uint256) { return weights_[i]; }

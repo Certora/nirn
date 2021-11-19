@@ -80,7 +80,7 @@ methods {
     getAdapter(uint256) returns address envfree
     // adapter
     //TODO - need a symbolic adapter
-    balanceUnderlying() => CONSTANT
+    // balanceUnderlying() => CONSTANT
 
     // helpers
     checkRemoveAdapters(uint256[], uint256 ) envfree
@@ -118,13 +118,19 @@ invariant total_supply_vs_balance() // TODO
     totalSupply() == 0 <=> balance() == 0 
 {
     preserved withdraw(uint256 amount) with (env e){
-        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+            feeRecipient() != currentContract;
     }
     preserved withdrawFromUnusedAdapter(address adapter) with (env e){
-        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+            feeRecipient() != currentContract;
     }
     preserved withdrawUnderlying(uint256 amount) with (env e){
-        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+            feeRecipient() != currentContract;
     }
 }
 
@@ -132,13 +138,19 @@ invariant balance_GE_totalSupply() // TODO
     balance() >= totalSupply()
 {
     preserved withdraw(uint256 amount) with (env e){
-        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+            feeRecipient() != currentContract;
     }
     preserved withdrawFromUnusedAdapter(address adapter) with (env e){
-        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+            feeRecipient() != currentContract;
     }
     preserved withdrawUnderlying(uint256 amount) with (env e){
-        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+            feeRecipient() != currentContract;
     }
 }
 
@@ -273,7 +285,7 @@ rule validity_removeAdapters() {
         uint256 amountY;
 
         require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
-        require sharesX <= balanceOf(e.msg.sender);
+        // require sharesX <= balanceOf(e.msg.sender);
 
         storage init = lastStorage;
 
@@ -282,31 +294,48 @@ rule validity_removeAdapters() {
 
         assert sharesX > sharesY => amountX >= amountY;
     }
-    rule more_user_shares_less_contract_underlying(){
+    rule more_user_shares_less_underlying(method f) filtered {f -> f.selector != transfer(address,uint256).selector && f.selector != transferFrom(address,address,uint256).selector}{
         env e;
 
-        uint256 sharesX;
-        uint256 amountX;
-
-        uint256 Underlying_balance_before = underlyingToken.balanceOf(e,currentContract);
+        uint256 Underlying_balance_before = underlyingToken.balanceOf(e,e.msg.sender);
         uint256 User_balance_before = balanceOf(e.msg.sender);
 
+        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && 
+                e.msg.sender != feeRecipient() && feeRecipient() != currentContract;
 
 
-        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
-        // require sharesX <= User_balance_before;
-
-        amountX =  withdraw(e,sharesX);
+        calldataarg args;
+        f(e,args);
      
-        uint256 Underlying_balance_after = underlyingToken.balanceOf(e,currentContract);
+        uint256 Underlying_balance_after = underlyingToken.balanceOf(e,e.msg.sender);
         uint256 User_balance_after = balanceOf(e.msg.sender);
 
-        assert User_balance_after > User_balance_before => Underlying_balance_after < Underlying_balance_before;
+        assert User_balance_after > User_balance_before <=> Underlying_balance_after < Underlying_balance_before;
+        assert User_balance_after < User_balance_before <=> Underlying_balance_after > Underlying_balance_before;
     }
 
-    rule price_monotonicity(){
-    uint price = priceAtLastFee();
+    rule price_monotonicity(method f, env e){
     claimFees();
-    assert priceAtLastFee() >= price;
+    uint256 _price = priceAtLastFee();
+    uint256 _supply = totalSupply();
+    uint256 _balance = balance();
+
+    claimFees();
+    uint256 price_ = priceAtLastFee();
+    uint256 supply_ = totalSupply();
+    uint256 balance_ = balance();
+    assert price_ >= _price;
     }
     
+    invariant collect_fees_check(env e)
+    balanceOf(feeRecipient()) < totalSupply() / 2 &&
+            (e.msg.sender != currentContract && e.msg.sender != Adapter &&
+            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+            feeRecipient() != currentContract)
+    // {
+    //     preserved{
+    //     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+    //             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+    //             feeRecipient() != currentContract;
+    //     }
+    // }

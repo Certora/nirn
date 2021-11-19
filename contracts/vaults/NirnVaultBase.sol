@@ -231,7 +231,7 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     IRewardsSeller _rewardsSeller = rewardsSeller;
     require(address(_rewardsSeller) != address(0), "null seller");
     ERC20(rewardsToken).transfer(address(_rewardsSeller), _balance);
-    _rewardsSeller.sellRewards(msg.sender, rewardsToken, underlying, params);
+    // _rewardsSeller.sellRewards(msg.sender, rewardsToken, underlying, params);
   }
 
   function withdrawFromUnusedAdapter(IErc20Adapter adapter) external {
@@ -314,7 +314,8 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     emit FeesClaimed(totalFees, equivalentShares);
     _mint(feeRecipient, equivalentShares);
     newSupply = supply.add(equivalentShares);
-    priceAtLastFee = totalBalance.toFractionE18(newSupply).toUint128();
+    // require (priceAtLastFee < totalBalance.toFractionE18(newSupply).toUint128()); //Gadi
+    priceAtLastFee = totalBalance.toFractionE18(supply).toUint128();
   }
 
   function claimFees() external {
