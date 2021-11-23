@@ -93,6 +93,14 @@ methods {
 }
 
 ghost symbolic_approver(address) returns bool;
+
+
+definition outOfScope(method f) returns bool = 
+                f.selector == rebalanceWithNewAdapters(address[], uint256[]).selector ||
+                f.selector == rebalance().selector ||
+                f.selector == rebalanceWithNewWeights(uint256[]).selector 
+                ;
+
 ////////////////////////////////////////////////////////////////////////////
 //                       Invariants                                       //
 ////////////////////////////////////////////////////////////////////////////
@@ -111,6 +119,7 @@ ghost symbolic_approver(address) returns bool;
 
 invariant total_supply_vs_balance()   // has some failures 
     totalSupply() == 0 <=> balance() == 0 
+    filtered { f-> !outOfScope(f) && !f.isView}
 {
     preserved withdraw(uint256 amount) with (env e){
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
@@ -133,6 +142,7 @@ invariant total_supply_vs_balance()   // has some failures
 
 invariant balanceSheet_equals_balance() // Passing
     balance() == getBalanceSheetTotalBalance()
+    filtered { f-> !outOfScope(f) && !f.isView}
 
 
 
@@ -201,10 +211,7 @@ rule additive_withdraw() { // timing out
     assert indexed_shares_seq == indexed_shares_sum, "additivity of fees failed";
 }
 
-rule no_double_fee(method f) filtered {f -> (f.selector != rebalance().selector ||
-                                             f.selector != rebalanceWithNewWeights(uint256[]).selector ||
-                                             f.selector != rebalanceWithNewAdapters(address[],uint256[]).selector    
-                                            )} { // filtered out functions that are timing out
+rule no_double_fee(method f) filtered { f-> !outOfScope(f) && !f.isView} { // filtered out functions that are timing out
     env e; calldataarg args;
     require e.msg.sender != feeRecipient();
 
@@ -235,19 +242,16 @@ rule whitelist_adapter_only() { // TODO
 }
 
 
-invariant adapter_length_eq_weight()
-    adaptersLength() == weightsLength()
-
-invariant adapters_are_unique(uint256 i, uint256 j)
-    i != j => getAdapter(i) != getAdapter(j)
+invariant integrity_adapter_list(uint i, uint j)
+    // equal size
+    adaptersLength() == weightsLength() &&
+    // uniqueness
+    ( i != j => getAdapter(i) != getAdapter(j) )
+    filtered { f-> !outOfScope(f) && !f.isView}
 
 invariant isApprovedAdapter(address adapter, env e)
     isApprovedAdapterInRegistry(e,adapter)
-    // filtered{f -> f.selector != isApprovedAdapter_instate.selector }
-
-    
-    
-   
+    filtered { f-> !outOfScope(f) && !f.isView}   
 
 rule deposit_GR_zero(){ //failing due to bugs in the code
     env e;
@@ -280,7 +284,7 @@ rule more_shares_more_withdraw(){ //failing
 }
 
 rule more_user_shares_less_underlying(method f) // failures need to check 
-        filtered {f -> f.selector != transfer(address,uint256).selector && f.selector != transferFrom(address,address,uint256).selector}{
+        filtered {f -> f.selector != transfer(address,uint256).selector && f.selector != transferFrom(address,address,uint256).selector && !f.isView }{
     env e;
 
     uint256 Underlying_balance_before = underlyingToken.balanceOf(e,e.msg.sender);
@@ -300,7 +304,7 @@ rule more_user_shares_less_underlying(method f) // failures need to check
     assert User_balance_after < User_balance_before <=> Underlying_balance_after > Underlying_balance_before;
 }
 
-rule price_monotonicity(method f, env e){ //failing due to bug in the code
+rule price_monotonicity(method f, env e) filtered { f-> !outOfScope(f) && !f.isView} { //failing due to bug in the code
     claimFees();
     uint256 _price = priceAtLastFee();
     uint256 _supply = totalSupply();
