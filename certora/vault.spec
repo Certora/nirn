@@ -57,7 +57,7 @@ methods {
     claimFees() envfree
     // setRewardsSeller(IRewardsSeller)
     sellRewards(address, bytes) => DISPATCHER(true)
-    //0x00e00ebb => NONDET
+    balanceUnderlying() returns (uint256) =>  DISPATCHER(true)
     // withdrawFromUnusedAdapter(IErc20Adapter)
     // getBalanceSheet(IErc20Adapter[])
     getBalances() returns (uint256[])
@@ -122,16 +122,19 @@ invariant total_supply_vs_balance()   // has some failures
     filtered { f-> !outOfScope(f) && !f.isView}
 {
     preserved withdraw(uint256 amount) with (env e){
+        requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
     }
     preserved withdrawFromUnusedAdapter(address adapter) with (env e){
+        requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
     }
     preserved withdrawUnderlying(uint256 amount) with (env e){
+        requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
@@ -317,6 +320,22 @@ rule price_monotonicity(method f, env e) filtered { f-> !outOfScope(f) && !f.isV
     assert price_ >= _price;
 }
     
+    invariant collect_fees_check(env e)
+    balanceOf(feeRecipient()) < totalSupply() / 2 //&&
+            // (e.msg.sender != currentContract && e.msg.sender != Adapter &&
+            // e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+            // feeRecipient() != currentContract)
+    {
+        preserved{
+        requireInvariant adapter_balance_underlying(e);
+        require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+                e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+                feeRecipient() != currentContract;
+        }
+    }
+
+    invariant adapter_balance_underlying(env e)
+    balance() == 0 => balanceUnderlying(e) == 0
 
 
 ////////////////////////////////////////////////////////////////////////////
