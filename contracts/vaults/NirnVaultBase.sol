@@ -295,8 +295,8 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
   }
 
 /* ========== Fees ========== */
-
-  function calculateFee(uint256 totalBalance, uint256 supply) internal view returns (uint256) {
+// harnessed to be public
+  function calculateFee(uint256 totalBalance, uint256 supply) public view returns (uint256) {
     uint256 valueAtLastCollectionPrice = supply.mulFractionE18(priceAtLastFee);
     if (totalBalance <= valueAtLastCollectionPrice) return 0;
     uint256 profit = totalBalance.sub(valueAtLastCollectionPrice);
