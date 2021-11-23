@@ -55,7 +55,7 @@ methods {
     claimFees() envfree
     // setRewardsSeller(IRewardsSeller)
     sellRewards(address, bytes) => DISPATCHER(true)
-    //0x00e00ebb => NONDET
+    balanceUnderlying() returns (uint256) =>  DISPATCHER(true)
     // withdrawFromUnusedAdapter(IErc20Adapter)
     // getBalanceSheet(IErc20Adapter[])
     getBalances() returns (uint256[])
@@ -83,7 +83,7 @@ methods {
     // balanceUnderlying() => CONSTANT
 
     // helpers
-    checkRemoveAdapters(uint256[], uint256 ) envfree
+    // checkRemoveAdapters(uint256[], uint256 ) envfree
     getBalanceSheetTotalBalance() returns (uint256) envfree
 
     // isApprovedAdapter(address adapter) returns bool envfree
@@ -118,16 +118,19 @@ invariant total_supply_vs_balance() // TODO
     totalSupply() == 0 <=> balance() == 0 
 {
     preserved withdraw(uint256 amount) with (env e){
+        requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
     }
     preserved withdrawFromUnusedAdapter(address adapter) with (env e){
+        requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
     }
     preserved withdrawUnderlying(uint256 amount) with (env e){
+        requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
@@ -231,16 +234,6 @@ rule whitelist_adapter_only() { // TODO
     assert false, "not yet implemented";
 }
 
-rule validity_removeAdapters() {
-    uint256[] toRemove;
-    uint256 len = 2;
-    require toRemove.length == 2; 
-    require adaptersLength() == 4;
-    require toRemove[0] <= adaptersLength()-1;
-    require toRemove[1] <= adaptersLength()-1;
-    invoke checkRemoveAdapters(toRemove, len);
-    assert !lastReverted;
-}
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////
@@ -328,14 +321,18 @@ rule validity_removeAdapters() {
     }
     
     invariant collect_fees_check(env e)
-    balanceOf(feeRecipient()) < totalSupply() / 2 &&
-            (e.msg.sender != currentContract && e.msg.sender != Adapter &&
-            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-            feeRecipient() != currentContract)
-    // {
-    //     preserved{
-    //     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
-    //             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-    //             feeRecipient() != currentContract;
-    //     }
-    // }
+    balanceOf(feeRecipient()) < totalSupply() / 2 //&&
+            // (e.msg.sender != currentContract && e.msg.sender != Adapter &&
+            // e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+            // feeRecipient() != currentContract)
+    {
+        preserved{
+        requireInvariant adapter_balance_underlying(e);
+        require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+                e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+                feeRecipient() != currentContract;
+        }
+    }
+
+    invariant adapter_balance_underlying(env e)
+    balance() == 0 => balanceUnderlying(e) == 0
