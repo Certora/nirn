@@ -201,7 +201,6 @@ rule additive_deposit() { // Timing out
     uint256 balance_sequential = balance();
 
     // return to storage state
-    
     uint256 shares_xy = deposit(e, x + y) at initStorage;
     uint256 indexed_shares_sum = balanceOf(feeRecipient());
     uint256 balance_additive = balance();
@@ -234,23 +233,27 @@ rule additive_withdraw() { // TODO
     assert indexed_shares_seq == indexed_shares_sum, "additivity of fees failed";
 }
 
-rule no_double_fee(method f) filtered {f -> (f.selector != rebalance().selector ||
-                                             f.selector != rebalanceWithNewWeights(uint256[]).selector ||
-                                             f.selector != rebalanceWithNewAdapters(address[],uint256[]).selector    
-                                            )} { // filtered out functions that are timing out
+rule no_double_fee(method f) filtered {f -> f.selector == deposit(uint256).selector }{ 
+    
+    // (f.selector != rebalance().selector ||
+    //                                          f.selector != rebalanceWithNewWeights(uint256[]).selector ||
+    //                                          f.selector != rebalanceWithNewAdapters(address[],uint256[]).selector    
+    //                                         )} { // filtered out functions that are timing out
     env e; calldataarg args;
+
+    // assume sender is not the fee receipient or current contract
+    // are there scenarios where this could happen?
     require e.msg.sender != feeRecipient();
+    require e.msg.sender != currentContract;
 
     uint256 balance_pre = balance();
-    // make sure there is no yield beforehand to claim
-
-
     uint256 supply_pre = totalSupply();
     uint256 indexed_shares_pre = balanceOf(feeRecipient());
 
     require indexed_shares_pre < supply_pre; // cex where indexed had all shares
-    require calculateFee(balance_pre, supply_pre) == 0;
-
+    // require calculateFee(balance_pre, supply_pre) == 0; // we want to assume that fees have already been claimed
+    
+    claimFees();
     f(e, args);
     claimFees();
     
