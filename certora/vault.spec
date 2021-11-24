@@ -57,7 +57,7 @@ methods {
     claimFees() envfree
     // setRewardsSeller(IRewardsSeller)
     sellRewards(address, bytes) => DISPATCHER(true)
-    //0x00e00ebb => NONDET
+    balanceUnderlying() returns (uint256) =>  DISPATCHER(true)
     // withdrawFromUnusedAdapter(IErc20Adapter)
     // getBalanceSheet(IErc20Adapter[])
     getBalances() returns (uint256[])
@@ -102,67 +102,37 @@ ghost symbolic_approver(address) returns bool;
 // assuming that all of v(p) is liquid”For a given vault the target balance is equal to stored v(p) multiplied by given adapter weight w, 
 // assuming v(p) is liquid 
 // t(w) = v(p) * w
-invariant target_balance_accurate() // TODO
-    false
-
-// Weights always above minimum values (they list this in the WP as a pre-requisite for rebalance)
-// Section 3.3, point 5 of the WP
-invariant min_weights() // TODO
-    false
-
-// (WP section 3.3 point 6), after a rebalance the weights should always increase the net APR (by >=5% of current value)
-invariant rebalance_safety() // TODO
-    false
+//invariant target_balance_accurate() // TODO
+  //  false
 
 
 
-invariant total_supply_vs_balance() // TODO
+
+
+invariant total_supply_vs_balance()   // has some failures 
     totalSupply() == 0 <=> balance() == 0 
 {
     preserved withdraw(uint256 amount) with (env e){
+        requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
     }
     preserved withdrawFromUnusedAdapter(address adapter) with (env e){
+        requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
     }
     preserved withdrawUnderlying(uint256 amount) with (env e){
+        requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
     }
 }
 
-invariant balance_GE_totalSupply() // TODO
-    balance() >= totalSupply()
-{
-    preserved withdraw(uint256 amount) with (env e){
-    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
-            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-            feeRecipient() != currentContract;
-    }
-    preserved withdrawFromUnusedAdapter(address adapter) with (env e){
-    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
-            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-            feeRecipient() != currentContract;
-    }
-    preserved withdrawUnderlying(uint256 amount) with (env e){
-    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
-            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-            feeRecipient() != currentContract;
-    }
-}
 
-// each vault maps to an underlying (for underlying that apply?)
-invariant vault_underlying_mapping() // TODO
-    false
-
-// no underlying can map to more than one vault
-invariant underlying_single_vault() // TODO
-    false
 
 invariant balanceSheet_equals_balance() // Passing
     balance() == getBalanceSheetTotalBalance()
@@ -183,7 +153,7 @@ invariant balanceSheet_equals_balance() // Passing
 
 // deposit x and deposit y is the same as deposit x+ y
 // see potential issues 
-rule additive_deposit() { // Timing out
+rule additive_deposit() { // failures
     env e;
     // require total supply = total balance 
     uint256 x; uint256 y;
@@ -210,7 +180,7 @@ rule additive_deposit() { // Timing out
     assert indexed_shares_seq == indexed_shares_sum, "additivity of fees failed";
 }
 // might as well write this to go with additive deposit
-rule additive_withdraw() { // TODO
+rule additive_withdraw() { // timing out
     env e;
     uint256 x; uint256 y;
     // store state
@@ -270,90 +240,73 @@ rule whitelist_adapter_only() { // TODO
     assert false, "not yet implemented";
 }
 
-// rule validity_removeAdapters() {
-//     uint256[] toRemove;
-//     uint256 len = 2;
-//     require toRemove.length == 2; 
-//     require adaptersLength() == 4;
-//     require toRemove[0] <= adaptersLength()-1;
-//     require toRemove[1] <= adaptersLength()-1;
-//     invoke checkRemoveAdapters(toRemove, len);
-//     assert !lastReverted;
-// }
-////////////////////////////////////////////////////////////////////////////
-//                       Helper Functions                                 //
-////////////////////////////////////////////////////////////////////////////
 
-// TODO: Any additional helper functions
-
-    invariant adapter_length_eq_weight()
+invariant adapter_length_eq_weight()
     adaptersLength() == weightsLength()
 
-    invariant adapters_are_unique(uint256 i, uint256 j)
+invariant adapters_are_unique(uint256 i, uint256 j)
     i != j => getAdapter(i) != getAdapter(j)
 
-    invariant isApprovedAdapter(address adapter, env e)
+invariant isApprovedAdapter(address adapter, env e)
     isApprovedAdapterInRegistry(e,adapter)
     // filtered{f -> f.selector != isApprovedAdapter_instate.selector }
 
     
-    invariant adapters_lenght_ge_2()
-    adaptersLength() >= 2
-
     
-    // invariant reserveBalance_GE_20(env e)
-    // reserveBalance(e) * 5 <= balance()
+   
 
-    rule deposit_GR_zero(){
-        env e;
-        require e.msg.sender != currentContract;
-        require maximumUnderlying(e) > 0;
+rule deposit_GR_zero(){ //failing due to bugs in the code
+    env e;
+    require e.msg.sender != currentContract;
+    require maximumUnderlying(e) > 0;
 
-        uint256 amount;
-        uint256 amountMinted = deposit(e,amount);
+    uint256 amount;
+    uint256 amountMinted = deposit(e,amount);
 
-        assert amount > 0 <=> amountMinted > 0;
-    }
+    assert amount > 0 <=> amountMinted > 0;
+}
 
-    rule more_shares_more_withdraw(){
-        env e;
+rule more_shares_more_withdraw(){ //failing 
+    env e;
 
-        uint256 sharesX;
-        uint256 sharesY;
-        uint256 amountX;
-        uint256 amountY;
+    uint256 sharesX;
+    uint256 sharesY;
+    uint256 amountX;
+    uint256 amountY;
 
-        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
-        // require sharesX <= balanceOf(e.msg.sender);
+    require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && e.msg.sender != feeRecipient();
+    // require sharesX <= balanceOf(e.msg.sender);
 
-        storage init = lastStorage;
+    storage init = lastStorage;
 
-        amountX =  withdraw(e,sharesX);
-        amountY =  withdraw(e,sharesY) at init;
+    amountX =  withdraw(e,sharesX);
+    amountY =  withdraw(e,sharesY) at init;
 
-        assert sharesX > sharesY => amountX >= amountY;
-    }
-    rule more_user_shares_less_underlying(method f) filtered {f -> f.selector != transfer(address,uint256).selector && f.selector != transferFrom(address,address,uint256).selector}{
-        env e;
+    assert sharesX > sharesY => amountX >= amountY;
+}
 
-        uint256 Underlying_balance_before = underlyingToken.balanceOf(e,e.msg.sender);
-        uint256 User_balance_before = balanceOf(e.msg.sender);
+rule more_user_shares_less_underlying(method f) // failures need to check 
+        filtered {f -> f.selector != transfer(address,uint256).selector && f.selector != transferFrom(address,address,uint256).selector}{
+    env e;
 
-        require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && 
-                e.msg.sender != feeRecipient() && feeRecipient() != currentContract;
+    uint256 Underlying_balance_before = underlyingToken.balanceOf(e,e.msg.sender);
+    uint256 User_balance_before = balanceOf(e.msg.sender);
+
+    require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && 
+            e.msg.sender != feeRecipient() && feeRecipient() != currentContract;
 
 
-        calldataarg args;
-        f(e,args);
-     
-        uint256 Underlying_balance_after = underlyingToken.balanceOf(e,e.msg.sender);
-        uint256 User_balance_after = balanceOf(e.msg.sender);
+    calldataarg args;
+    f(e,args);
+    
+    uint256 Underlying_balance_after = underlyingToken.balanceOf(e,e.msg.sender);
+    uint256 User_balance_after = balanceOf(e.msg.sender);
 
-        assert User_balance_after > User_balance_before <=> Underlying_balance_after < Underlying_balance_before;
-        assert User_balance_after < User_balance_before <=> Underlying_balance_after > Underlying_balance_before;
-    }
+    assert User_balance_after > User_balance_before <=> Underlying_balance_after < Underlying_balance_before;
+    assert User_balance_after < User_balance_before <=> Underlying_balance_after > Underlying_balance_before;
+}
 
-    rule price_monotonicity(method f, env e){
+rule price_monotonicity(method f, env e){ //failing due to bug in the code
     claimFees();
     uint256 _price = priceAtLastFee();
     uint256 _supply = totalSupply();
@@ -364,17 +317,27 @@ rule whitelist_adapter_only() { // TODO
     uint256 supply_ = totalSupply();
     uint256 balance_ = balance();
     assert price_ >= _price;
-    }
+}
     
     invariant collect_fees_check(env e)
-    balanceOf(feeRecipient()) < totalSupply() / 2 &&
-            (e.msg.sender != currentContract && e.msg.sender != Adapter &&
-            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-            feeRecipient() != currentContract)
-    // {
-    //     preserved{
-    //     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
-    //             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-    //             feeRecipient() != currentContract;
-    //     }
-    // }
+    balanceOf(feeRecipient()) < totalSupply() / 2 //&&
+            // (e.msg.sender != currentContract && e.msg.sender != Adapter &&
+            // e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+            // feeRecipient() != currentContract)
+    {
+        preserved{
+        requireInvariant adapter_balance_underlying(e);
+        require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+                e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+                feeRecipient() != currentContract;
+        }
+    }
+
+    invariant adapter_balance_underlying(env e)
+    balance() == 0 => balanceUnderlying(e) == 0
+
+
+////////////////////////////////////////////////////////////////////////////
+//                       Helper Functions                                 //
+////////////////////////////////////////////////////////////////////////////
+
