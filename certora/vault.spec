@@ -58,6 +58,7 @@ methods {
     // setRewardsSeller(IRewardsSeller)
     sellRewards(address, bytes) => DISPATCHER(true)
     balanceUnderlying() returns (uint256) =>  DISPATCHER(true)
+    setBalanceUnderlying(uint256) => DISPATCHER(true)
     // withdrawFromUnusedAdapter(IErc20Adapter)
     // getBalanceSheet(IErc20Adapter[])
     getBalances() returns (uint256[])
@@ -203,7 +204,8 @@ rule additive_withdraw() { // timing out
     assert indexed_shares_seq == indexed_shares_sum, "additivity of fees failed";
 }
 
-rule no_double_fee(method f) filtered {f -> f.selector == deposit(uint256).selector }{ 
+rule no_double_fee(method f) filtered {f -> (f.selector == deposit(uint256).selector ||
+                                             f.selector == withdraw(uint256).selector) }{ 
     
     // (f.selector != rebalance().selector ||
     //                                          f.selector != rebalanceWithNewWeights(uint256[]).selector ||
@@ -216,14 +218,17 @@ rule no_double_fee(method f) filtered {f -> f.selector == deposit(uint256).selec
     require e.msg.sender != feeRecipient();
     require e.msg.sender != currentContract;
 
+
+    // claimFees(); // should (with proper behavior) ensure there are no residual fees to collect
+    
+
     uint256 balance_pre = balance();
     uint256 supply_pre = totalSupply();
     uint256 indexed_shares_pre = balanceOf(feeRecipient());
 
+    require calculateFee(balance_pre, supply_pre) == 0; // to reduce timeouts, trying to start the rule in the state where fees have been collected
     require indexed_shares_pre < supply_pre; // cex where indexed had all shares
-    // require calculateFee(balance_pre, supply_pre) == 0; // we want to assume that fees have already been claimed
-    
-    claimFees();
+
     f(e, args);
     claimFees();
     
@@ -233,6 +238,77 @@ rule no_double_fee(method f) filtered {f -> f.selector == deposit(uint256).selec
     
     // if a fee was claimed the shares of index will go up, this 
     assert indexed_shares_pre != indexed_shares_post => balance_pre == balance_post && supply_pre == supply_post, "fee claimed on balance";
+}
+
+
+// reduce the starting balance and then claim fee, the fee should be 0
+// hypothesis: this will timeout with two arbitray functions
+rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of underlying value
+    env e;
+
+    uint256 balance_pre = balance();
+    uint256 supply_pre = totalSupply();
+    uint256 underlying_balance = Adapter.balanceUnderlying(e);
+
+    require calculateFee(balance_pre, supply_pre) == 0;
+
+    // drop balance underlying
+    uint256 underlying_balance_drop;
+    require underlying_balance_drop < underlying_balance;
+    Adapter.setBalanceUnderlying(e, underlying_balance_drop);
+
+    uint256 balance_drop = balance();
+    uint256 supply_drop = totalSupply();
+    assert calculateFee(balance_drop, supply_drop) == 0, "fee claimed on drop?";
+
+    // balance underlying goes back up
+    uint256 underlying_balance_end;
+    require underlying_balance_end <= underlying_balance;
+    require underlying_balance_end > underlying_balance_drop;
+    Adapter.setBalanceUnderlying(e, underlying_balance_end);
+
+    uint256 balance_raise = balance();
+    uint256 supply_raise = totalSupply();
+    assert calculateFee(balance_raise, supply_raise) == 0, "double fee claimed on raise";
+
+    // this only checks calculate fee, does not go all the way through claim fee. TODO try on calculat fee
+    // this also does not check the scenario where the underlyingbalance goes up enogh that 
+}
+
+// this was specifically to show withdraw underlying fails this property, but is good to test on other functions
+rule shares_correlate_balance(method f) filtered {f -> (f.selector != rebalanceWithNewWeights(uint256[]).selector ||
+                                                        f.selector != rebalanceWithNewAdapters(address[],uint256[]).selector)
+}{
+    env e; calldataarg args;
+
+    uint256 balance_pre = balance();
+    uint256 supply_pre = totalSupply();
+
+    f(e, args);
+
+    uint256 balance_post = balance();
+    uint256 supply_post = totalSupply();
+    assert balance_pre != balance_post <=> supply_pre != supply_post, "balance or shares changed without the other";
+}
+
+rule withdraw_underlying_no_shares() {
+    env e;
+
+    uint256 amount;
+    require amount > 0; 
+
+    uint256 vault_balance_pre = balance(); 
+    uint256 user_balance_pre = underlyingToken.balanceOf(e, e.msg.sender);
+    uint256 vault_shares = totalSupply(); // for information
+
+    uint256 shares = withdrawUnderlying(e, amount);
+    require shares == 0; 
+
+    uint256 user_balance_post = underlyingToken.balanceOf(e, e.msg.sender);
+    uint256 vault_balance_post = balance();
+
+    assert shares == 0 => vault_balance_pre == vault_balance_post, "amount received with no shares burned";
+    assert shares == 0 => user_balance_pre == user_balance_post, "balance increased at no share cost";
 }
 
 // only whitelisted adapters can be used
@@ -253,7 +329,6 @@ invariant isApprovedAdapter(address adapter, env e)
 
     
     
-   
 
 rule deposit_GR_zero(){ //failing due to bugs in the code
     env e;

@@ -55,6 +55,8 @@ contract SymbolicERC20Adapter {
 
   function balanceUnderlying() external view returns (uint256) { return _balanceUnderlyingDummy; }
 
+  function setBalanceUnderlying(uint256 newBalance) external { _balanceUnderlyingDummy = newBalance; }
+
 /* ========== Interactions ========== */
 
   mapping (uint => mapping (uint => uint)) underlyingToAmount;
