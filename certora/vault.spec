@@ -134,8 +134,10 @@ invariant total_supply_vs_balance()   // has some failures
 }
 
 
-
-invariant balanceSheet_equals_balance() // Passing
+/* STATUS: 
+Passing
+*/
+invariant balanceSheet_equals_balance() 
     balance() == getBalanceSheetTotalBalance()
 
 
@@ -153,7 +155,8 @@ invariant balanceSheet_equals_balance() // Passing
 // amountOut = withdraw(shares)amountOut > current_liquid_reserves => vault reserves are empty
 
 // deposit x and deposit y is the same as deposit x+ y
-// see potential issues 
+/* STATUS: 
+*/
 rule additive_deposit() { // failures
     env e;
     // require total supply = total balance 
@@ -181,7 +184,10 @@ rule additive_deposit() { // failures
     assert indexed_shares_seq == indexed_shares_sum, "additivity of fees failed";
 }
 // might as well write this to go with additive deposit
-rule additive_withdraw() { // timing out
+/* STATUS: 
+ timing out
+*/
+rule additive_withdraw() { 
     env e;
     uint256 x; uint256 y;
     // store state
@@ -204,7 +210,12 @@ rule additive_withdraw() { // timing out
     assert indexed_shares_seq == indexed_shares_sum, "additivity of fees failed";
 }
 
+/* STATUS: 
+deposit: cex
+withdraw: timeout
+*/
 rule no_double_fee(method f) filtered {f -> (f.selector == deposit(uint256).selector ||
+                                            f.selector == depositTo(uint256, address).selector ||
                                              f.selector == withdraw(uint256).selector) }{ 
     
     // (f.selector != rebalance().selector ||
@@ -218,9 +229,7 @@ rule no_double_fee(method f) filtered {f -> (f.selector == deposit(uint256).sele
     require e.msg.sender != feeRecipient();
     require e.msg.sender != currentContract;
 
-
-    // claimFees(); // should (with proper behavior) ensure there are no residual fees to collect
-    
+    // claimFees(); // should (with proper behavior) ensure there are no residual fees to collect    
 
     uint256 balance_pre = balance();
     uint256 supply_pre = totalSupply();
@@ -237,10 +246,12 @@ rule no_double_fee(method f) filtered {f -> (f.selector == deposit(uint256).sele
     uint256 indexed_shares_post = balanceOf(feeRecipient());
     
     // if a fee was claimed the shares of index will go up, this 
-    assert indexed_shares_pre != indexed_shares_post => balance_pre == balance_post && supply_pre == supply_post, "fee claimed on balance";
+    assert indexed_shares_pre != indexed_shares_post, "fee claimed on balance";
 }
 
-
+/* STATUS: 
+PASSING - needs review if suggested improvements are important
+*/
 // reduce the starting balance and then claim fee, the fee should be 0
 // hypothesis: this will timeout with two arbitray functions
 rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of underlying value
@@ -271,10 +282,13 @@ rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of 
     uint256 supply_raise = totalSupply();
     assert calculateFee(balance_raise, supply_raise) == 0, "double fee claimed on raise";
 
-    // this only checks calculate fee, does not go all the way through claim fee. TODO try on calculat fee
+    // this only checks calculate fee, does not go all the way through claim fee. TODO try on claim fee
     // this also does not check the scenario where the underlyingbalance goes up enogh that 
 }
 
+/* STATUS: 
+
+*/
 // this was specifically to show withdraw underlying fails this property, but is good to test on other functions
 rule shares_correlate_balance(method f) filtered {f -> (f.selector != rebalanceWithNewWeights(uint256[]).selector ||
                                                         f.selector != rebalanceWithNewAdapters(address[],uint256[]).selector)
@@ -291,15 +305,22 @@ rule shares_correlate_balance(method f) filtered {f -> (f.selector != rebalanceW
     assert balance_pre != balance_post <=> supply_pre != supply_post, "balance or shares changed without the other";
 }
 
+/* STATUS: 
+    generates counter examples:
+    Balance is 2 with shares of 1, you can withdraw 1 token without burning your share
+*/
 rule withdraw_underlying_no_shares() {
     env e;
 
     uint256 amount;
-    require amount > 0; 
+    // require amount > 0;
+    require amount > 10000; // taking 1 of a token isn't very interesting
+
 
     uint256 vault_balance_pre = balance(); 
     uint256 user_balance_pre = underlyingToken.balanceOf(e, e.msg.sender);
     uint256 vault_shares = totalSupply(); // for information
+    uint256 user_shares = balanceOf(e.msg.sender);
 
     uint256 shares = withdrawUnderlying(e, amount);
     require shares == 0; 
