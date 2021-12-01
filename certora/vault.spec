@@ -256,7 +256,7 @@ rule no_double_fee(method f) filtered {f -> (f.selector == deposit(uint256).sele
     uint256 indexed_shares_post = balanceOf(feeRecipient());
     
     // if a fee was claimed the shares of index will go up, this 
-    assert indexed_shares_pre != indexed_shares_post, "fee claimed on balance";
+    assert indexed_shares_pre == indexed_shares_post, "fee claimed on balance";
 }
 
 /* STATUS: 
