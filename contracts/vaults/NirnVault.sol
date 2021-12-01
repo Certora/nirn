@@ -313,10 +313,7 @@ contract NirnVault is NirnVaultBase {
 
 
   // certora helpers 
-  function checkRemoveAdapters(uint256[] memory removedIndices, uint256 len) public {
-    removeAdapters(removedIndices, len);
-  }
-
+  
   function weightsLength() external view returns (uint256) { return weights_.length; }
 
   function getWeight(uint i) external view returns (uint256) { return weights_[i]; }
