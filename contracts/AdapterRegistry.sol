@@ -240,10 +240,10 @@ contract AdapterRegistry is Ownable(), IAdapterRegistry {
     uint256 len = adapters.length;
     aprs = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
-      // try IErc20Adapter(adapters[i]).getAPR() returns (uint256 apr) {
+      try IErc20Adapter(adapters[i]).getAPR() returns (uint256 apr) {
         aprs[i] = apr;
-      // } catch { //
-      // aprs[i] = 0;
+      } catch {
+      aprs[i] = 0;
       }
     }
     adapters.sortByDescendingScore(aprs);

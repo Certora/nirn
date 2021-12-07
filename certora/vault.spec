@@ -26,6 +26,8 @@ methods {
     withdrawUnderlyingUpTo(uint256) => DISPATCHER(true)
     availableLiquidity() => DISPATCHER(true)
 
+    underlying() returns (address) envfree
+
     // Vault functions
     deposit(uint256) returns (uint256)
     withdraw(uint256) returns (uint256)
@@ -167,7 +169,7 @@ invariant balanceSheet_equals_balance()
 // deposit x and deposit y is the same as deposit x+ y
 /* STATUS: 
 */
-rule additive_deposit() { // failures
+rule additive_deposit() {
     env e;
     // require total supply = total balance 
     uint256 x; uint256 y;
@@ -264,7 +266,7 @@ PASSING - needs review if suggested improvements are important
 */
 // reduce the starting balance and then claim fee, the fee should be 0
 // hypothesis: this will timeout with two arbitray functions
-rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of underlying value
+rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of underlying value                                                                        
     env e;
 
     uint256 balance_pre = balance();
@@ -300,9 +302,8 @@ rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of 
 
 */
 // this was specifically to show withdraw underlying fails this property, but is good to test on other functions
-rule shares_correlate_balance(method f) filtered {f -> (f.selector != rebalanceWithNewWeights(uint256[]).selector ||
-                                                        f.selector != rebalanceWithNewAdapters(address[],uint256[]).selector)
-}{
+rule shares_correlate_balance(method f) filtered { f-> !outOfScope(f) && !f.isView }
+{
     env e; calldataarg args;
 
     uint256 balance_pre = balance();
@@ -340,6 +341,38 @@ rule withdraw_underlying_no_shares() {
 
     assert shares == 0 => vault_balance_pre == vault_balance_post, "amount received with no shares burned";
     assert shares == 0 => user_balance_pre == user_balance_post, "balance increased at no share cost";
+}
+
+
+rule transfer_then_withdraw(method f) filtered { f-> !outOfScope(f) && !f.isView }
+{
+    env e; calldataarg args;
+
+    // no vault will start with 0 in either
+    require balance() > 0;
+    require totalSupply() > 0; 
+
+    uint256 transferAmount;
+    require transferAmount > 1000; // to make things interesting (must be greater than 0 for a good cex to be generated)
+    uint256 depositAmount;
+
+    uint256 shares = deposit(e, depositAmount);
+
+    // transfer to setup
+    underlyingToken.transfer(e, underlying(), transferAmount);
+
+    // storage postTransfer = lastStorage;
+
+    uint256 underlyingBack = withdraw(e, shares);
+
+    // I chose less than intentionally. If they are equal somebody could go even while causing a competitor to lose their funds
+    assert underlyingBack < depositAmount + transferAmount, "value taken from vault";
+
+    // f(e, args) at postTransfer;
+
+    // uint256 underlyingBackwithF = withdraw(e, shares);
+
+    // assert underlyingBackwithF < depositAmount + transferAmount, "transfer + arbitrary function siphons from vault";
 }
 
 // only whitelisted adapters can be used
