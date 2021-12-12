@@ -89,8 +89,8 @@ methods {
     // checkRemoveAdapters(uint256[], uint256 ) envfree // should be removed??
     getBalanceSheetTotalBalance() returns (uint256) envfree
 
-    // isApprovedAdapter(address adapter) returns bool envfree
-    isApprovedAdapter(address adapter) => symbolic_approver(adapter)
+    isApprovedAdapter(address adapter) returns bool envfree
+    // isApprovedAdapter(address adapter) => symbolic_approver(adapter)
 }
 
 ghost symbolic_approver(address) returns bool;
@@ -123,19 +123,19 @@ invariant total_supply_vs_balance()   // has some failures
     filtered { f-> !outOfScope(f) && !f.isView}
 {
     preserved withdraw(uint256 amount) with (env e){
-        requireInvariant adapter_balance_underlying(e);
+        // requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
     }
     preserved withdrawFromUnusedAdapter(address adapter) with (env e){
-        requireInvariant adapter_balance_underlying(e);
+        // requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
     }
     preserved withdrawUnderlying(uint256 amount) with (env e){
-        requireInvariant adapter_balance_underlying(e);
+        // requireInvariant adapter_balance_underlying(e);
     require e.msg.sender != currentContract && e.msg.sender != Adapter &&
             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
             feeRecipient() != currentContract;
@@ -294,6 +294,9 @@ rule shares_correlate_balance(method f) filtered {f -> (f.selector != rebalanceW
     uint256 balance_pre = balance();
     uint256 supply_pre = totalSupply();
 
+    require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && 
+            e.msg.sender != feeRecipient() && feeRecipient() != currentContract;
+
     f(e, args);
 
     uint256 balance_post = balance();
@@ -405,12 +408,9 @@ rule price_monotonicity(method f, env e) filtered { f-> !outOfScope(f) && !f.isV
     uint256 balance_ = balance();
     assert price_ >= _price;
 }
-    
+/*    
     invariant collect_fees_check(env e)
-    balanceOf(feeRecipient()) < totalSupply() / 2 //&&
-            // (e.msg.sender != currentContract && e.msg.sender != Adapter &&
-            // e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-            // feeRecipient() != currentContract)
+    balanceOf(feeRecipient()) < totalSupply() / 2 
     {
         preserved{
         requireInvariant adapter_balance_underlying(e);
@@ -420,8 +420,15 @@ rule price_monotonicity(method f, env e) filtered { f-> !outOfScope(f) && !f.isV
         }
     }
 
-    invariant adapter_balance_underlying(env e)
-    balance() == 0 => balanceUnderlying(e) == 0
+    invariant adapter_balance_underlying(env d)
+    (getAdapter(0) == Adapter && balance() == 0) => Adapter.balanceUnderlying(d) == 0
+    {
+        preserved with (env e){
+        require e.msg.sender != currentContract && e.msg.sender != Adapter &&
+                e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
+                feeRecipient() != currentContract;
+        }
+    }*/
 
 
 ////////////////////////////////////////////////////////////////////////////
