@@ -38,6 +38,9 @@ methods {
     getAdapterWithHighestAPR(address) returns (address, uint256)
     getAdapterWithHighestAPRForDeposit(address, uint256, address) returns (address, uint256)
 
+    vaultsByUnderlying(address) returns (address) envfree
+    protocolAdapters(uint256) returns (address) envfree
+    protocolAdapterIds(address) returns (uint256) envfree
     // external method summaries
 }
 
@@ -45,19 +48,43 @@ methods {
 //                       Invariants                                       //
 ////////////////////////////////////////////////////////////////////////////
 
-// Adapters cant go over the maximum amount
-invariant adapter_constrained_max_length() // TODO
+// underlying corresponds to a single vault
+// originally the rule was there can't be more than 1 vault for a single underlying, but their mapping doesn't even allow this
+// Q: is this invariant something the syste should hold
+invariant underlying_single_vault(address underlying1, address underlying2)
+    vaultsByUnderlying(underlying1) != vaultsByUnderlying(underlying2)
+    
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
 
 // only owner or whitelist protocol can add or edit adapters
-rule adapter_mutate_onlyOwnerOrProtocol() { // TODO
-    assert false, "not yet implemented";
+rule adapter_mutate_onlyOwnerOrProtocol(method f) { // TODO
+    env e; calldataarg args;
+    uint256 ID;
+    address adapter_pre = protocolAdapters(ID);
+
+    f(e, args);
+
+    address adapter_post = protocolAdapters(ID);
+
+    // this is what they do in their code, I'm not sure if this will show anything
+    assert adapter_pre != adapter_post != e.msg.sender == owner() || protocolAdapterIds[msg.sender] > 0, "non protocol or owner changed adapters";
 }
 
-// we discussed this but I'm not sure how it would play out
-rule state_change_onlyOwner() { // TODO
-    assert false, "not yet implemented"
-}
+
+
+
+
+// not sure if these are actually needed
+
+// // we discussed this but I'm not sure how it would play out
+// rule state_change_onlyOwner() { // TODO
+//     assert false, "not yet implemented";
+// }
+
+// // each vault created correlates to an underlying
+// rule vault_underlying_mapping() { // TODO
+//     assert false, "not yet implemented";
+// }
