@@ -47,6 +47,12 @@ contract AdapterRegistry is Ownable(), IAdapterRegistry {
 
   /** @dev List of all underlying tokens with registered adapters. */
   EnumerableSet.AddressSet internal supportedTokens;
+ 
+/* ========== Harness ============ */
+ 
+function vaultsContains(address vault) external view returns (bool) {
+    return vaults.contains(vault);
+}
 
 /* ========== Modifiers ========== */
 

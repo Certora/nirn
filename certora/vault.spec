@@ -8,47 +8,31 @@ import "helpers/erc20.spec"
 using DummyERC20Impl as underlyingToken
 using SymbolicERC20Adapter as adapter
 
-// TODO: harness internal functions (is this change still coming soon?)
-// TODO: add support for the IErc20Adapter (if needed)
-// TODO: add support for "DistributionParameters" (if needed)
-// TODO: add support for IRewardsSellar (if needed)
-
 ////////////////////////////////////////////////////////////////////////////
 //                      Methods                                           //
 ////////////////////////////////////////////////////////////////////////////
 
 methods {
-    // from sanity
     deposit(uint256) => DISPATCHER(true)
     withdraw(uint256) => DISPATCHER(true)
-    withdrawAll() => DISPATCHER(true)
-    withdrawUnderlying(uint256) => DISPATCHER(true)
-    withdrawUnderlyingUpTo(uint256) => DISPATCHER(true)
-    availableLiquidity() => DISPATCHER(true)
-
-    underlying() returns (address) envfree
 
     // Vault functions
     deposit(uint256) returns (uint256)
     withdraw(uint256) returns (uint256)
-    
     getCurrentLiquidityDeltas() returns (int256[])
     getAPR() returns (uint256)
     depositTo(uint256, address) returns (uint256)
-    // withdrawInternal(uint256, uint256, IErc20Adapter[], uint256[], BalanceSheet)
-    // withdrawToMatchAmount(IErc20Adapter[], uint256[], uint256[], uint256, uint256, uint256)
     rebalance()
     rebalanceWithNewWeights(uint256[])
-    // currentDistribution() returns (DistributionParameters, uint256, uint256)
-    // processProposedDistribution(DistributionParameters, uint256, IErc20Adapter[], uint256[]) returns (DistributionParameters)
-    // rebalanceWithNewAdapters(IErc20Adapter[], uint256[])
-    // _transferOut(address, uint256) // internal
+
+    withdrawAll() => DISPATCHER(true)
+    withdrawUnderlying(uint256) => DISPATCHER(true)
+    withdrawUnderlyingUpTo(uint256) => DISPATCHER(true)
+    availableLiquidity() => DISPATCHER(true)
+    underlying() returns (address) envfree
 
     // Vault Base functions
     decimals() returns (uint8)
-    // getAdaptersAndWeights() returns (IErc20Adapter[], uint256[])
-    // setAdaptersAndWeights(IErc20Adapter[], uint256[])
-    // removeAdapters(uint256[], uint256) // internal
     initialize(address, address, address, address)
     setMaximumUnderlying(uint256)
     setPerformanceFee(uint64)
@@ -57,34 +41,26 @@ methods {
     feeRecipient() returns (address) envfree
     priceAtLastFee() returns (uint128) envfree
     claimFees() envfree
-    // setRewardsSeller(IRewardsSeller)
     sellRewards(address, bytes) => DISPATCHER(true)
     balanceUnderlying() returns (uint256) =>  DISPATCHER(true)
     setBalanceUnderlying(uint256) => DISPATCHER(true)
-    // withdrawFromUnusedAdapter(IErc20Adapter)
-    // getBalanceSheet(IErc20Adapter[])
     getBalances() returns (uint256[])
     balance() returns (uint256) envfree
     totalSupply() returns uint256 envfree
     reserveBalance() returns (uint256)
     calculateFee(uint256, uint256) returns (uint256) envfree // internal normally
     getPendingFees() returns (uint256)
-    // claimFees(uint256, uint256) returns (uint256) // internal
     getPricePerFullShare() returns (uint256)
     getPricePerFullShareWithFee() returns (uint256)
 
+    // erc20 function
     balanceOf(address) returns(uint256) envfree
-    
-    // beforeAddAdapter(IErc20Adapter)
-    // beforeAddAdapters(IErc20Adapter[])
-    // external method summaries
 
     // harness
     adaptersLength() returns uint envfree
     weightsLength() returns uint envfree
     getAdapter(uint256) returns address envfree
     // adapter
-    //TODO - need a symbolic adapter
     // balanceUnderlying() => CONSTANT
 
     // helpers
@@ -443,9 +419,6 @@ rule transfer_then_withdraw(method f) filtered { f-> !outOfScope(f) && !f.isView
     // storage postTransfer = lastStorage;
 
     uint256 underlyingBack = withdraw(e, shares);
-
-    // I chose less than intentionally. If they are equal somebody could go even while causing a competitor to lose their funds
-    // generates a cex with ^ on high ratio of shares to balance
     assert underlyingBack <= depositAmount + transferAmount, "value taken from vault";
 
     // f(e, args) at postTransfer;
