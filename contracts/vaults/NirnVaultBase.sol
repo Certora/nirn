@@ -313,7 +313,7 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     uint256 equivalentShares = totalFees.mul(supply) / totalBalance.sub(totalFees);
     emit FeesClaimed(totalFees, equivalentShares);
     _mint(feeRecipient, equivalentShares);
-    newSupply = supply.add(equivalentShares);
+    newSupply = totalSupply; //Gadi supply.add(equivalentShares);
     // require (priceAtLastFee < totalBalance.toFractionE18(newSupply).toUint128()); //Gadi
     priceAtLastFee = totalBalance.toFractionE18(supply).toUint128();
   }
