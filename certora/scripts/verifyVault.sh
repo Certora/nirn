@@ -16,6 +16,6 @@ certoraRun contracts/vaults/NirnVault.sol certora/harness/DummyERC20Impl.sol cer
     --optimistic_loop --loop_iter 1 \
     --settings -copyLoopUnroll=1,-t=600,-postProcessCounterExamples=true --cache indexed \
     --msg "indexed vault ${msg}" \
-    --link NirnVault:underlying=DummyERC20Impl \
+    --link NirnVault:underlying=DummyERC20Impl SymbolicERC20Adapter:_underlying=DummyERC20Impl \
     --solc solc7.6 \
     --staging

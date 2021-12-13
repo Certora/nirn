@@ -376,7 +376,7 @@ rule shares_correlate_balance(method f) filtered { f-> !outOfScope(f) && !f.isVi
     uint256 balance_pre = balance();
     uint256 supply_pre = totalSupply();
 
-    require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && 
+    require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
             e.msg.sender != feeRecipient() && feeRecipient() != currentContract;
 
     f(e, args);
@@ -545,16 +545,16 @@ rule price_monotonicity(method f, env e) filtered { f-> !outOfScope(f) && !f.isV
                 feeRecipient() != currentContract;
         }
     }
-
-    invariant adapter_balance_underlying(env d)
-    (getAdapter(0) == Adapter && balance() == 0) => Adapter.balanceUnderlying(d) == 0
-    {
-        preserved with (env e){
-        require e.msg.sender != currentContract && e.msg.sender != Adapter &&
-                e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-                feeRecipient() != currentContract;
+*/
+    invariant adapter_balance_underlying(env e, uint256 i)
+    balance() == 0 && getAdapter(i) == adapter => adapter.balanceUnderlying(e) == 0 {
+        preserved {
+            require adaptersLength() <= 3;
+            requireInvariant integrity_adapter_list(i,0);
+            requireInvariant integrity_adapter_list(i,1);
+            requireInvariant integrity_adapter_list(i,2);
         }
-    }*/
+    }
 
 
 ////////////////////////////////////////////////////////////////////////////
