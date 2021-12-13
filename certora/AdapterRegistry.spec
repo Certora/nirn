@@ -3,10 +3,10 @@
     For more information, visit: https://www.certora.com/
 */
 
-import '../helpers/erc20.spec'
-import 'vault.spec'
+import "helpers/erc20.spec"
 
-using NirnVault as Vault
+// import 'vault.spec'
+// using NirnVault as Vault
 
 ////////////////////////////////////////////////////////////////////////////
 //                      Methods                                           //
@@ -20,7 +20,6 @@ methods {
     removeVault(address)
     addProtocolAdapter(address) returns (uint256)
     removeProtocolAdapter(address)
-    _addTokenAdapter(IErc20Adapter, uint256)
     addTokenAdapter(address)
     addTokenAdapters(address[])
     removeTokenAdapter(address)
@@ -30,7 +29,7 @@ methods {
     getProtocolMetadata(uint256) returns (address, string)
     getProtocolForTokenAdapter(address) returns (address)
     isSupported(address) returns (bool)
-    getSupportedTokens() returns (address[]
+    getSupportedTokens() returns (address[])
     isApprovedAdapter(address) returns (bool)
     getAdaptersList(address) returns (address[])
     getAdapterForWrapperToken(address) returns (address)
@@ -46,6 +45,8 @@ methods {
     
     // harness
     vaultsContains(address) returns (bool) envfree
+
+    underlying() returns (address) => DISPATCHER(true);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -83,8 +84,8 @@ rule adapter_mutate_onlyOwnerOrProtocol(method f) { // TODO
 // write an invariant that asserts that every fault in the set correlates to an underlying in the vaultsByUnderlying 
 // any underlying that has a vault should be in the supported tokens 
 
-// invariant vaults_correlate_underlying(address vault)
-//     vaultsContains(vault) => 
+invariant vaults_correlate_underlying(address vault)
+    vaultsContains(vault) => vault.underlying() == vaultsByUnderlying(vault)
 
 // not sure if these are actually needed
 

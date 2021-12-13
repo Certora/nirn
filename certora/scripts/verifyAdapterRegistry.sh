@@ -11,14 +11,13 @@ fi
 msg=$1
 shift 1
 
-certoraRun contracts/AdapterRegistry.sol certora/harness/DummyERC20Impl.sol certora/harness/SymbolicERC20Adapter.sol \
-    --verify AdapterRegistry:certora/vaultSanity.spec \
+certoraRun contracts/AdapterRegistry.sol certora/harness/DummyERC20Impl.sol certora/harness/SymbolicERC20Adapter.sol contracts/vaults/NirnVault.sol\
+    --verify AdapterRegistry:certora/AdapterRegistry.spec \
     --optimistic_loop --loop_iter 1 \
     --settings -copyLoopUnroll=1,-depth=1,-t=600,-postProcessCounterExamples=true --cache indexed  \
     --msg "AdapterRegistry ${msg}" \
     --link AdapterRegistry:underlying=DummyERC20Impl \
+    --link AdapterRegistry:vault=NirnVault \
     --solc solc7.6 \
     --staging 
 
-
-    # --link AdapterRegistry:vault=NirnVault \

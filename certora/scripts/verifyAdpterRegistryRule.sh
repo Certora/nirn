@@ -8,19 +8,18 @@ if [ -z "$2" ]
     exit 1
 fi
 
-msg=$1
-rule=$2
+rule=$1
+msg=$2
 shift 2
 
-certoraRun contracts/AdapterRegistry.sol certora/harness/DummyERC20Impl.sol certora/harness/SymbolicERC20Adapter.sol \
-    --verify AdapterRegistry:certora/vaultSanity.spec \
+certoraRun contracts/AdapterRegistry.sol certora/harness/DummyERC20Impl.sol certora/harness/SymbolicERC20Adapter.sol contracts/vaults/NirnVault.sol \
+    --verify AdapterRegistry:certora/AdapterRegistry.spec \
     --optimistic_loop --loop_iter 1 \
     --settings -copyLoopUnroll=1,-depth=1,-t=600,-postProcessCounterExamples=true --cache indexed  \
     --msg "AdapterRegistry ${msg}" \
     --rule ${rule} \
-    --link AdapterRegistry:underlying=DummyERC20Impl \
-
     --solc solc7.6 \
     --staging 
 
+    # --link AdapterRegistry:underlying=DummyERC20Impl \
     # --link AdapterRegistry:vault=NirnVault \
