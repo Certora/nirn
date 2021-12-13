@@ -4,7 +4,9 @@
 */
 
 import '../helpers/erc20.spec'
+import 'vault.spec'
 
+using NirnVault as Vault
 
 ////////////////////////////////////////////////////////////////////////////
 //                      Methods                                           //
@@ -41,7 +43,9 @@ methods {
     vaultsByUnderlying(address) returns (address) envfree
     protocolAdapters(uint256) returns (address) envfree
     protocolAdapterIds(address) returns (uint256) envfree
-    // external method summaries
+    
+    // harness
+    vaultsContains(address) returns (bool) envfree
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -70,19 +74,19 @@ rule adapter_mutate_onlyOwnerOrProtocol(method f) { // TODO
     address adapter_post = protocolAdapters(ID);
 
     // this is what they do in their code, I'm not sure if this will show anything
-    assert adapter_pre != adapter_post != e.msg.sender == owner() || protocolAdapterIds[msg.sender] > 0, "non protocol or owner changed adapters";
+    assert adapter_pre != adapter_post => e.msg.sender == owner() || protocolAdapterIds(msg.sender) > 0, "non protocol or owner changed adapters";
 }
 
 
 
+// add a harness for the vault set
+// write an invariant that asserts that every fault in the set correlates to an underlying in the vaultsByUnderlying 
+// any underlying that has a vault should be in the supported tokens 
 
+// invariant vaults_correlate_underlying(address vault)
+//     vaultsContains(vault) => 
 
 // not sure if these are actually needed
-
-// // we discussed this but I'm not sure how it would play out
-// rule state_change_onlyOwner() { // TODO
-//     assert false, "not yet implemented";
-// }
 
 // // each vault created correlates to an underlying
 // rule vault_underlying_mapping() { // TODO

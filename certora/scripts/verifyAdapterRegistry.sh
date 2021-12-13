@@ -18,4 +18,7 @@ certoraRun contracts/AdapterRegistry.sol certora/harness/DummyERC20Impl.sol cert
     --msg "AdapterRegistry ${msg}" \
     --link AdapterRegistry:underlying=DummyERC20Impl \
     --solc solc7.6 \
-    --staging "shelly/indexedFixes"
+    --staging 
+
+
+    # --link AdapterRegistry:vault=NirnVault \
