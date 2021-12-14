@@ -8,47 +8,31 @@ import "helpers/erc20.spec"
 using DummyERC20Impl as underlyingToken
 using SymbolicERC20Adapter as adapter
 
-// TODO: harness internal functions (is this change still coming soon?)
-// TODO: add support for the IErc20Adapter (if needed)
-// TODO: add support for "DistributionParameters" (if needed)
-// TODO: add support for IRewardsSellar (if needed)
-
 ////////////////////////////////////////////////////////////////////////////
 //                      Methods                                           //
 ////////////////////////////////////////////////////////////////////////////
 
 methods {
-    // from sanity
     deposit(uint256) => DISPATCHER(true)
     withdraw(uint256) => DISPATCHER(true)
-    withdrawAll() => DISPATCHER(true)
-    withdrawUnderlying(uint256) => DISPATCHER(true)
-    withdrawUnderlyingUpTo(uint256) => DISPATCHER(true)
-    availableLiquidity() => DISPATCHER(true)
-
-    underlying() returns (address) envfree
 
     // Vault functions
     deposit(uint256) returns (uint256)
     withdraw(uint256) returns (uint256)
-    
     getCurrentLiquidityDeltas() returns (int256[])
     getAPR() returns (uint256)
     depositTo(uint256, address) returns (uint256)
-    // withdrawInternal(uint256, uint256, IErc20Adapter[], uint256[], BalanceSheet)
-    // withdrawToMatchAmount(IErc20Adapter[], uint256[], uint256[], uint256, uint256, uint256)
     rebalance()
     rebalanceWithNewWeights(uint256[])
-    // currentDistribution() returns (DistributionParameters, uint256, uint256)
-    // processProposedDistribution(DistributionParameters, uint256, IErc20Adapter[], uint256[]) returns (DistributionParameters)
-    // rebalanceWithNewAdapters(IErc20Adapter[], uint256[])
-    // _transferOut(address, uint256) // internal
+
+    withdrawAll() => DISPATCHER(true)
+    withdrawUnderlying(uint256) => DISPATCHER(true)
+    withdrawUnderlyingUpTo(uint256) => DISPATCHER(true)
+    availableLiquidity() => DISPATCHER(true)
+    underlying() returns (address) envfree
 
     // Vault Base functions
     decimals() returns (uint8)
-    // getAdaptersAndWeights() returns (IErc20Adapter[], uint256[])
-    // setAdaptersAndWeights(IErc20Adapter[], uint256[])
-    // removeAdapters(uint256[], uint256) // internal
     initialize(address, address, address, address)
     setMaximumUnderlying(uint256)
     setPerformanceFee(uint64)
@@ -57,34 +41,26 @@ methods {
     feeRecipient() returns (address) envfree
     priceAtLastFee() returns (uint128) envfree
     claimFees() envfree
-    // setRewardsSeller(IRewardsSeller)
     sellRewards(address, bytes) => DISPATCHER(true)
     balanceUnderlying() returns (uint256) =>  DISPATCHER(true)
     setBalanceUnderlying(uint256) => DISPATCHER(true)
-    // withdrawFromUnusedAdapter(IErc20Adapter)
-    // getBalanceSheet(IErc20Adapter[])
     getBalances() returns (uint256[])
     balance() returns (uint256) envfree
     totalSupply() returns uint256 envfree
     reserveBalance() returns (uint256)
     calculateFee(uint256, uint256) returns (uint256) envfree // internal normally
     getPendingFees() returns (uint256)
-    // claimFees(uint256, uint256) returns (uint256) // internal
     getPricePerFullShare() returns (uint256)
     getPricePerFullShareWithFee() returns (uint256)
 
+    // erc20 function
     balanceOf(address) returns(uint256) envfree
-    
-    // beforeAddAdapter(IErc20Adapter)
-    // beforeAddAdapters(IErc20Adapter[])
-    // external method summaries
 
     // harness
     adaptersLength() returns uint envfree
     weightsLength() returns uint envfree
     getAdapter(uint256) returns address envfree
     // adapter
-    //TODO - need a symbolic adapter
     // balanceUnderlying() => CONSTANT
 
     // helpers
@@ -101,7 +77,6 @@ ghost symbolic_highest_adapter(address) returns address;
 
 
 definition outOfScope(method f) returns bool = 
-                f.selector == rebalanceWithNewAdapters(address[], uint256[]).selector ||
                 f.selector == rebalance().selector ||
                 f.selector == rebalanceWithNewWeights(uint256[]).selector 
                 ;
@@ -109,18 +84,6 @@ definition outOfScope(method f) returns bool =
 ////////////////////////////////////////////////////////////////////////////
 //                       Invariants                                       //
 ////////////////////////////////////////////////////////////////////////////
-
-
-// “The target balance t(w) is the amount of capital that should be held by a vault in a token adapter with weight w, 
-// assuming that all of v(p) is liquid”For a given vault the target balance is equal to stored v(p) multiplied by given adapter weight w, 
-// assuming v(p) is liquid 
-// t(w) = v(p) * w
-//invariant target_balance_accurate() // TODO
-  //  false
-
-
-
-
 
 invariant total_supply_vs_balance()   // has some failures 
     totalSupply() == 0 <=> balance() == 0 
@@ -195,11 +158,6 @@ invariant balanceSheet_equals_balance()
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
 
-// Withdraw more than reserves
-// “Withdrawing an amount greater than current liquid reserves invokes a chain of withdrawals … . In the event that this happens, 
-// the vault reserves are empty until the next deposit or rebalance.”
-// amountOut = withdraw(shares)amountOut > current_liquid_reserves => vault reserves are empty
-
 // deposit x and deposit y is the same as deposit x+ y
 /* STATUS: 
 */
@@ -268,12 +226,8 @@ rule no_double_fee(method f) filtered {f -> (f.selector == deposit(uint256).sele
 {     
     env e; calldataarg args;
 
-    // assume sender is not the fee receipient or current contract
-    // are there scenarios where this could happen?
     require e.msg.sender != feeRecipient();
     require e.msg.sender != currentContract;
-
-    // claimFees(); // should (with proper behavior) ensure there are no residual fees to collect    
 
     uint256 balance_pre = balance();
     uint256 supply_pre = totalSupply();
@@ -283,13 +237,13 @@ rule no_double_fee(method f) filtered {f -> (f.selector == deposit(uint256).sele
     require indexed_shares_pre < supply_pre; // cex where indexed had all shares
 
     f(e, args);
-    
+    claimFees();
+
     uint256 supply_post = totalSupply();
     uint256 balance_post = balance();
     uint256 indexed_shares_post = balanceOf(feeRecipient());
     
-    // if a fee was claimed the shares of index will go up, this 
-    assert indexed_shares_pre == indexed_shares_post, "fee claimed on balance";
+    assert indexed_shares_pre == indexed_shares_post, "fee claimed on balance"; 
     assert calculateFee(balance_post, supply_post) == 0, "repeated fee left to claim";
 }
 
@@ -297,8 +251,6 @@ rule no_double_fee(method f) filtered {f -> (f.selector == deposit(uint256).sele
 rule no_double_fee_depositTo() {
 env e; calldataarg args;
 
-    // assume sender is not the fee receipient or current contract
-    // are there scenarios where this could happen?
     require e.msg.sender != feeRecipient();
     require e.msg.sender != currentContract;
 
@@ -341,7 +293,7 @@ rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of 
 
     require calculateFee(balance_pre, supply_pre) == 0;
 
-    // drop balance underlying
+    // drops balance underlying
     uint256 underlying_balance_drop;
     require underlying_balance_drop < underlying_balance;
     require adapter.externalUserAddress() != currentContract;
@@ -360,9 +312,6 @@ rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of 
     uint256 balance_raise = balance();
     uint256 supply_raise = totalSupply();
     assert calculateFee(balance_raise, supply_raise) == 0, "double fee claimed on raise";
-
-    // this only checks calculate fee, does not go all the way through claim fee. TODO try on claim fee
-    // this also does not check the scenario where the underlyingbalance goes up enogh that 
 }
 
 /* STATUS: 
@@ -376,7 +325,7 @@ rule shares_correlate_balance(method f) filtered { f-> !outOfScope(f) && !f.isVi
     uint256 balance_pre = balance();
     uint256 supply_pre = totalSupply();
 
-    require e.msg.sender != currentContract && e.msg.sender != Adapter && e.msg.sender != underlyingToken && 
+    require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
             e.msg.sender != feeRecipient() && feeRecipient() != currentContract;
 
     f(e, args);
@@ -418,7 +367,6 @@ rule transfer_then_withdraw(method f) filtered { f-> !outOfScope(f) && !f.isView
 {
     env e; calldataarg args;
 
-    // no vault will start with 0 in either
     uint256 balance = balance();
     uint256 supply = totalSupply();
     require balance > 0;
@@ -428,31 +376,17 @@ rule transfer_then_withdraw(method f) filtered { f-> !outOfScope(f) && !f.isView
     // uint256 ratio = balance * 10 / supply;
     // require ratio < 20 && ratio > 5; // capping at balance:supply of 2:1 for now to simulate a relatively healthy vault
 
-
-
     uint256 transferAmount;
     require transferAmount > 1000; // to make things interesting (must be greater than 0 for a good cex to be generated)
-    // uint256 depositAmount;
 
-    uint256 shares; // = deposit(e, depositAmount);
+    uint256 shares; 
     uint256 depositAmount = shares * balance() / totalSupply();
 
     // transfer to setup
     underlyingToken.transfer(e, underlying(), transferAmount);
 
-    // storage postTransfer = lastStorage;
-
     uint256 underlyingBack = withdraw(e, shares);
-
-    // I chose less than intentionally. If they are equal somebody could go even while causing a competitor to lose their funds
-    // generates a cex with ^ on high ratio of shares to balance
     assert underlyingBack <= depositAmount + transferAmount, "value taken from vault";
-
-    // f(e, args) at postTransfer;
-
-    // uint256 underlyingBackwithF = withdraw(e, shares);
-
-    // assert underlyingBackwithF < depositAmount + transferAmount, "transfer + arbitrary function siphons from vault";
 }
 
 
@@ -545,16 +479,16 @@ rule price_monotonicity(method f, env e) filtered { f-> !outOfScope(f) && !f.isV
                 feeRecipient() != currentContract;
         }
     }
-
-    invariant adapter_balance_underlying(env d)
-    (getAdapter(0) == Adapter && balance() == 0) => Adapter.balanceUnderlying(d) == 0
-    {
-        preserved with (env e){
-        require e.msg.sender != currentContract && e.msg.sender != Adapter &&
-                e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-                feeRecipient() != currentContract;
+*/
+    invariant adapter_balance_underlying(env e, uint256 i)
+    balance() == 0 && getAdapter(i) == adapter => adapter.balanceUnderlying(e) == 0 {
+        preserved {
+            require adaptersLength() <= 3;
+            requireInvariant integrity_adapter_list(i,0);
+            requireInvariant integrity_adapter_list(i,1);
+            requireInvariant integrity_adapter_list(i,2);
         }
-    }*/
+    }
 
 
 ////////////////////////////////////////////////////////////////////////////
