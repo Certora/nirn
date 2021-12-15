@@ -1,21 +1,9 @@
-if [ -z "$1" ]
-  then
-    echo "Incorrect number of arguments"
-    echo ""
-    echo "Usage: (from git root)"
-    echo "  ./certora/scripts/`basename $0` [message describing the run]"
-    echo ""
-    exit 1
-fi
-
-msg=$1
-shift 1
-
 certoraRun contracts/vaults/NirnVault.sol certora/harness/DummyERC20Impl.sol certora/harness/SymbolicERC20Adapter.sol \
     --verify NirnVault:certora/vault.spec \
     --optimistic_loop --loop_iter 1 \
-    --settings -copyLoopUnroll=1,-t=600,-postProcessCounterExamples=true --cache indexed \
-    --msg "indexed vault ${msg}" \
-    --link NirnVault:underlying=DummyERC20Impl SymbolicERC20Adapter:_underlying=DummyERC20Impl \
+    --rule $1 \
+    --settings -copyLoopUnroll=1,-depth=16,-t=400,-postProcessCounterExamples=true --cache indexed \
+    --msg "indexed vault $1 $2" \
+    --link NirnVault:underlying=DummyERC20Impl \
     --solc solc7.6 \
     --staging
