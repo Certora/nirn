@@ -21,5 +21,6 @@ certoraRun contracts/AdapterRegistry.sol certora/harness/DummyERC20Impl.sol cert
     --solc solc7.6 \
     --staging 
 
-    # --link AdapterRegistry:underlying=DummyERC20Impl \
     # --link AdapterRegistry:vault=NirnVault \
+    # --link AdapterRegistry:underlying=DummyERC20Impl \
+    

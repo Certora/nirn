@@ -54,8 +54,12 @@ function vaultsContains(address vault) external view returns (bool) {
     return vaults.contains(vault);
 }
 
-function isProtocolOrOwner(address) external view returns (bool) {
-  return protocolAdapterIds[msg.sender] > 0 || msg.sender == owner();
+function isProtocolOrOwner(address ad) external view returns (bool) {
+  return protocolAdapterIds[ad] > 0 || ad == owner();
+}
+
+function getVaultUnderlying(address vault) external view returns (address) {
+  return INirnVault(vault).underlying();
 }
 
 /* ========== Modifiers ========== */

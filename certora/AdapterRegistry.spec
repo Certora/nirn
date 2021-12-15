@@ -46,6 +46,7 @@ methods {
     // harness
     vaultsContains(address) returns (bool) envfree
     isProtocolOrOwner(address) returns (bool) envfree
+    getVaultUnderlying(address) returns (address) envfree
 
     // attempt to dispatch this function with the vault while not linking
     // Vault.underlying() returns (address) => DISPATCHER(true);
@@ -57,10 +58,11 @@ methods {
 ////////////////////////////////////////////////////////////////////////////
 
 // underlying corresponds to a single vault
-// originally the rule was there can't be more than 1 vault for a single underlying, but their mapping doesn't even allow this
-// Q: is this invariant something the syste should hold
-invariant underlying_single_vault(address underlying1, address underlying2)
-    vaultsByUnderlying(underlying1) != vaultsByUnderlying(underlying2)
+invariant underlying_single_vault(address x, address y)
+    vaultsByUnderlying(x) != 0 && vaultsByUnderlying(y) != 0 => vaultsByUnderlying(x) != vaultsByUnderlying(y)
+{ preserved {
+    require x != y;
+}}
     
 
 ////////////////////////////////////////////////////////////////////////////
@@ -68,7 +70,7 @@ invariant underlying_single_vault(address underlying1, address underlying2)
 ////////////////////////////////////////////////////////////////////////////
 
 // only owner or whitelist protocol can add or edit adapters
-rule adapter_mutate_onlyOwnerOrProtocol(method f) { // TODO
+rule adapter_mutate_(method f) { // TODO
     env e; calldataarg args;
     uint256 ID;
     address adapter_pre = protocolAdapters(ID);
@@ -82,5 +84,5 @@ rule adapter_mutate_onlyOwnerOrProtocol(method f) { // TODO
 }
 
 invariant vaults_correlate_underlying(address vault)
-    vaultsContains(vault) => underlying() == vaultsByUnderlying(vault)
+    vaultsContains(vault) => getVaultUnderlying(vault) == vaultsByUnderlying(vault)
 
