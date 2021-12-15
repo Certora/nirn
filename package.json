@@ -17,7 +17,6 @@
   "dependencies": {
     "shelljs": "^0.8.4",
     "@openzeppelin/contracts": "^3.4.2"
-
   },
   "devDependencies": {
     "@ethersproject/bignumber": "^5.0.8",

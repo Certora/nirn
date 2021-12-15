@@ -11,3 +11,10 @@ last_conf*
 .DS_Store
 package-lock.json
 package.json
+package.json
+.gitignore
+.gitignore
+contracts/libraries/Ownable.sol
+contracts/libraries/Context.sol
+contracts/libraries/Initializable.sol
+yarn.lock
