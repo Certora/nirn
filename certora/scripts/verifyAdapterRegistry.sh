@@ -16,8 +16,6 @@ certoraRun contracts/AdapterRegistry.sol certora/harness/DummyERC20Impl.sol cert
     --optimistic_loop --loop_iter 1 \
     --settings -copyLoopUnroll=1,-depth=1,-t=600,-postProcessCounterExamples=true --cache indexed  \
     --msg "AdapterRegistry ${msg}" \
-    --link AdapterRegistry:underlying=DummyERC20Impl \
-    --link AdapterRegistry:vault=NirnVault \
     --solc solc7.6 \
     --staging 
 

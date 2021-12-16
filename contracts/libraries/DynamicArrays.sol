@@ -24,8 +24,8 @@ library DynamicArrays {
    * known beforehand. If the array can exceed `size`, pushing to it will corrupt memory.
    */
   function dynamicAddressArray(uint256 size) internal pure returns (address[] memory arr) {
-    arr = new address[](size);
-    assembly { mstore(arr, 0) }
+    arr = new address[](size + 1);
+    arr[0] = address(0);
   }
 
   /**
@@ -34,8 +34,8 @@ library DynamicArrays {
    * known beforehand. If the array can exceed length `size`, pushing to it will corrupt memory.
    */
   function dynamicUint256Array(uint256 size) internal pure returns (uint256[] memory arr) {
-    arr = new uint256[](size);
-    assembly { mstore(arr, 0) }
+    arr = new uint256[](size + 1);
+    arr[0] = 0;
   }
 
   /**
@@ -46,15 +46,9 @@ library DynamicArrays {
    * and unpredictable side effects.
    */
   function dynamicPush(address[] memory arr, address element) internal pure {
-    assembly {
-      let size := mload(arr)
-      let ptr := add(
-        add(arr, 32),
-        mul(size, 32)
-      )
-      mstore(ptr, element)
-      mstore(arr, add(size, 1))
-    }
+    uint160 next = uint160(arr[0]);
+    arr[next + 1] = element;
+    arr[0] = address(next + 1);
   }
 
   /**
@@ -65,14 +59,8 @@ library DynamicArrays {
    * and unpredictable side effects.
    */
   function dynamicPush(uint256[] memory arr, uint256 element) internal pure {
-    assembly {
-      let size := mload(arr)
-      let ptr := add(
-        add(arr, 32),
-        mul(size, 32)
-      )
-      mstore(ptr, element)
-      mstore(arr, add(size, 1))
-    }
+     uint next = arr[0];
+     arr[next + 1] = element;
+     arr[0] = next + 1;
   }
 }

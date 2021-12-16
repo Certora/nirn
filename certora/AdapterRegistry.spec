@@ -63,14 +63,19 @@ invariant underlying_single_vault(address x, address y)
 { preserved {
     require x != y;
 }}
-    
+
+invariant vaults_correlate_underlying(address vault)
+    vaultsContains(vault) => getVaultUnderlying(vault) == vaultsByUnderlying(vault)
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
 
 // only owner or whitelist protocol can add or edit adapters
-rule adapter_mutate_(method f) { // TODO
+/* Status
+Passing
+*/
+rule adapter_mutate_safe(method f) { // TODO
     env e; calldataarg args;
     uint256 ID;
     address adapter_pre = protocolAdapters(ID);
@@ -83,6 +88,5 @@ rule adapter_mutate_(method f) { // TODO
     assert adapter_pre != adapter_post => isProtocolOrOwner(e.msg.sender), "non protocol or owner changed adapters";
 }
 
-invariant vaults_correlate_underlying(address vault)
-    vaultsContains(vault) => getVaultUnderlying(vault) == vaultsByUnderlying(vault)
+
 

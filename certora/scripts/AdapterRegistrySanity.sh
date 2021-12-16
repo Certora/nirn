@@ -4,6 +4,6 @@ certoraRun contracts/AdapterRegistry.sol certora/harness/DummyERC20Impl.sol cert
     --settings -copyLoopUnroll=1,-depth=1,-t=60 \
     --msg "AdapterRegistry Sanity" \
     --solc solc7.6 \
-    --staging "shelly/indexedFixes"
+    --staging 
 
     # --link AdapterRegistry:underlying=DummyERC20Impl \
