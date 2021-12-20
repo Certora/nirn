@@ -361,12 +361,16 @@ rule withdraw_underlying_no_shares() {
     assert shares == 0 => vault_balance_pre == vault_balance_post, "amount received with no shares burned";
     assert shares == 0 => user_balance_pre == user_balance_post, "balance increased at no share cost";
 }
-
+/* 
+Status:
+PASSING
+*/ 
 
 rule transfer_then_withdraw(method f) filtered { f-> !outOfScope(f) && !f.isView }
 {
     env e; calldataarg args;
 
+    require underlyingToken.balanceOf(e, currentContract) == 0;
     uint256 balance = balance();
     uint256 supply = totalSupply();
     require balance > 0;

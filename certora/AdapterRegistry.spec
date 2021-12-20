@@ -50,6 +50,7 @@ methods {
 
     // attempt to dispatch this function with the vault while not linking
     // Vault.underlying() returns (address) => DISPATCHER(true);
+    underlying() returns (address) => DISPATCHER(true)
 
 }
 
@@ -58,22 +59,37 @@ methods {
 ////////////////////////////////////////////////////////////////////////////
 
 // underlying corresponds to a single vault
+/* STATUS
+FAILS only on ADDVAULT - seems they allow for this behavior - should we reccomend that they don't?
+*/
 invariant underlying_single_vault(address x, address y)
-    vaultsByUnderlying(x) != 0 && vaultsByUnderlying(y) != 0 => vaultsByUnderlying(x) != vaultsByUnderlying(y)
+    vaultsByUnderlying(x) != 0 => vaultsByUnderlying(x) != vaultsByUnderlying(y)
 { preserved {
     require x != y;
+    require x != 0;
+    require y != 0;
 }}
 
-invariant vaults_correlate_underlying(address vault)
-    vaultsContains(vault) => getVaultUnderlying(vault) == vaultsByUnderlying(vault)
 
+// if a vault exists and is registered, then the underlying of that vault should properly map back to itself
+/* 
+STATUS
+PASSING
+*/
+invariant vaults_correlate_underlying(address vault)
+    vaultsContains(vault) => vaultsByUnderlying(getVaultUnderlying(vault)) == vault
+{ preserved {
+    require vault == Vault;
+} preserved removeVault(address removed_vault) with (env e) {
+    require removed_vault == vault;
+}}
 ////////////////////////////////////////////////////////////////////////////
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
 
 // only owner or whitelist protocol can add or edit adapters
 /* Status
-Passing
+PASSING
 */
 rule adapter_mutate_safe(method f) { // TODO
     env e; calldataarg args;
