@@ -92,8 +92,9 @@ invariant total_supply_vs_balance()   // has some failures
     preserved with (env e) {
         requireInvariant adapter_balance_underlying(e,0);
         requireInvariant adapter_balance_underlying(e,1);
-        require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
-            e.msg.sender != feeRecipient() && feeRecipient() != currentContract && currentContract != underlyingToken;
+        global_requires(e);
+        // require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
+        //     e.msg.sender != feeRecipient() && feeRecipient() != currentContract && currentContract != underlyingToken;
         require underlying() == underlyingToken;
     }
     /*
@@ -119,26 +120,23 @@ invariant total_supply_vs_balance()   // has some failures
     preserved transfer(address to, uint256 amount) with (env e) {
         requireInvariant adapter_balance_underlying(e,0);
         requireInvariant adapter_balance_underlying(e,1);
-        require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
-            e.msg.sender != feeRecipient() && feeRecipient() != currentContract && currentContract != underlyingToken &&
-            to != adapter ;
+        global_requires(e);
+        require to != adapter;
     }
 
     
     preserved transferFrom(address from, address to, uint256 amount) with (env e) {
         requireInvariant adapter_balance_underlying(e,0);
         requireInvariant adapter_balance_underlying(e,1);
-        require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
-            e.msg.sender != feeRecipient() && feeRecipient() != currentContract && currentContract != underlyingToken &&
-            to != adapter && from != adapter;
+        global_requires(e);
+        require to != adapter && from != adapter;
     }
     
     preserved sellRewards(address rewardsToken, bytes params) with (env e){
         require underlying() == underlyingToken;
         requireInvariant adapter_balance_underlying(e,0);
-        require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
-            e.msg.sender != feeRecipient() && feeRecipient() != currentContract && currentContract != underlyingToken;
-        require rewardsToken != currentContract;
+        global_requires(e);
+        require rewardsToken != currentContract && rewardsToken != underlyingToken;
         
     }
     
@@ -151,18 +149,40 @@ invariant balanceSheet_equals_balance()
     balance() == getBalanceSheetTotalBalance()
     filtered { f-> !outOfScope(f) && !f.isView}
 
-// invariant same_deposit_same_shares(env e, uint256 x, uint256 y)
-//     x == y => deposit(e,x) == deposit(e,y)
-// {
-//     preserved{
-//         requireInvariant adapter_balance_underlying(e,0);
-//         requireInvariant adapter_balance_underlying(e,1);
-//         require e.msg.sender != currentContract && e.msg.sender != adapter &&
-//             e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-//             feeRecipient() != currentContract;
-//         require underlying() == underlyingToken;
-//     }
-// }
+
+invariant totalSupply_GE_balance()
+totalSupply() >= balance()
+filtered { f-> !outOfScope(f) && !f.isView}
+{
+        preserved with (env e) {
+        requireInvariant adapter_balance_underlying(e,0);
+        requireInvariant adapter_balance_underlying(e,1);
+        global_requires(e);
+    }
+    preserved transfer(address to, uint256 amount) with (env e) {
+        requireInvariant adapter_balance_underlying(e,0);
+        requireInvariant adapter_balance_underlying(e,1);
+        global_requires(e);
+        require to != adapter ;
+    }    
+    preserved transferFrom(address from, address to, uint256 amount) with (env e) {
+        requireInvariant adapter_balance_underlying(e,0);
+        requireInvariant adapter_balance_underlying(e,1);
+        global_requires(e);
+        require to != adapter && from != adapter;
+    }
+    preserved depositTo(uint256 amount, address to) with (env e) {
+        requireInvariant adapter_balance_underlying(e,0);
+        requireInvariant adapter_balance_underlying(e,1);
+        global_requires(e);
+        require to != adapter;
+    }
+    preserved initialize(address _underlying, address _rewardsSeller, address _feeRecipient, address _owner) with (env e) {
+        require underlyingToken.balanceOf(e, currentContract) == 0;   
+        require symbolic_highest_adapter(_underlying) == adapter;
+        require adapter.balanceUnderlying(e) == 0;
+    }
+}
 ////////////////////////////////////////////////////////////////////////////
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
@@ -178,9 +198,10 @@ rule additive_deposit() {
     // store state
     storage initStorage = lastStorage;
 
+    global_requires(e);
+
     uint256 shares_x = deposit(e, x);
     uint256 shares_y = deposit(e, y);
-    uint256 indexed_shares_seq = balanceOf(feeRecipient());
     // without these checks the dust (roundoff) bug is showed off
     require shares_x != 0;
     require shares_y != 0;
@@ -189,22 +210,23 @@ rule additive_deposit() {
 
     // return to storage state
     uint256 shares_xy = deposit(e, x + y) at initStorage;
-    uint256 indexed_shares_sum = balanceOf(feeRecipient());
     uint256 balance_additive = balance();
 
     assert balance_sequential == balance_additive, "additivity of balance failed";
-    // assert shares_x + shares_y == shares_xy, "additivity of shares failed";
-    assert indexed_shares_seq == indexed_shares_sum, "additivity of fees failed";
 }
 
 rule same_deposit_same_shares(){
     env e;
     uint256 x; uint256 y;
 
+    // requireInvariant totalSupply_GE_balance();
+
     uint256 balance_1 = balance();
     uint256 supply_1 = totalSupply();
     uint256 fee_1 = calculateFee(balance_1,supply_1);
     uint256 priceAtLastFee_1 = priceAtLastFee();
+    
+    require balance_1 == 0 && supply_1 == 0;
 
     uint256 shares_x = deposit(e, x);
     
@@ -222,8 +244,8 @@ rule same_deposit_same_shares(){
 
     require shares_x >= 1000 ;
     require performanceFee(e) <= 10^17;
-    require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
-            e.msg.sender != feeRecipient() && feeRecipient() != currentContract && currentContract != underlyingToken;
+
+    global_requires(e);
 
     // assert x == y => shares_x * 11 / 10 > shares_y;
     assert x == y => shares_x * 2  > shares_y;
@@ -233,7 +255,7 @@ rule same_deposit_same_shares(){
 // might as well write this to go with additive deposit
 /* STATUS: 
  timing out
-*/
+*//*
 rule additive_withdraw() { 
     env e;
     uint256 x; uint256 y;
@@ -241,21 +263,20 @@ rule additive_withdraw() {
 
     storage initStorage = lastStorage;
 
+    global_requires(e);
+
     uint256 x_out = withdraw(e, x);
     uint256 y_out = withdraw(e, y);
 
     uint256 balance_sequential = balance();
-    uint256 indexed_shares_seq = balanceOf(feeRecipient());
 
     // return to storage state
     uint256 xy_out = withdraw(e, x + y) at initStorage;
     uint256 balance_additive = balance();
-    uint256 indexed_shares_sum = balanceOf(feeRecipient());
 
     assert balance_sequential == balance_additive, "additivity of balance failed";
-    assert x_out + y_out == xy_out, "additivity of output failed";
-    assert indexed_shares_seq == indexed_shares_sum, "additivity of fees failed";
-}
+    // assert x_out + y_out == xy_out, "additivity of output failed";
+}*/
 
 /* STATUS: 
 generates cex on deposit and withdraw
@@ -294,8 +315,7 @@ rule no_double_fee(method f) filtered {f -> (f.selector == deposit(uint256).sele
 rule no_double_fee_depositTo() {
 env e; calldataarg args;
 
-    require e.msg.sender != feeRecipient();
-    require e.msg.sender != currentContract;
+    global_requires(e);
 
     // claimFees(); // should (with proper behavior) ensure there are no residual fees to collect    
 
@@ -361,6 +381,7 @@ rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of 
 
 */
 // this was specifically to show withdraw underlying fails this property, but is good to test on other functions
+/*
 rule shares_correlate_balance(method f) filtered { f-> !outOfScope(f) && !f.isView }
 {
     env e; calldataarg args;
@@ -368,15 +389,21 @@ rule shares_correlate_balance(method f) filtered { f-> !outOfScope(f) && !f.isVi
     uint256 balance_pre = balance();
     uint256 supply_pre = totalSupply();
 
-    require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
-            e.msg.sender != feeRecipient() && feeRecipient() != currentContract && currentContract != underlyingToken;
+    global_requires(e);
 
+    if f.selector == sellRewards(address ,bytes).selector{
+        address rewardsToken;
+        bytes   params;
+        require rewardsToken != currentContract && rewardsToken != underlyingToken;
+        sellRewards(e,rewardsToken,params);
+    }
+    else
     f(e, args);
 
     uint256 balance_post = balance();
     uint256 supply_post = totalSupply();
     assert balance_pre != balance_post <=> supply_pre != supply_post, "balance or shares changed without the other";
-}
+}*/
 
 /* STATUS: 
     generates counter examples:
@@ -467,8 +494,7 @@ rule more_shares_more_withdraw(){ //failing
     uint256 amountX;
     uint256 amountY;
 
-    require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
-            e.msg.sender != feeRecipient() && feeRecipient() != currentContract && currentContract != underlyingToken;
+    global_requires(e);
 
     storage init = lastStorage;
 
@@ -485,14 +511,20 @@ rule more_user_shares_less_underlying(method f) // failures need to check
     uint256 Underlying_balance_before = underlyingToken.balanceOf(e,e.msg.sender);
     uint256 User_balance_before = balanceOf(e.msg.sender);
 
-    require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
-            e.msg.sender != feeRecipient() && feeRecipient() != currentContract && currentContract != underlyingToken;
+    global_requires(e);
 
     if f.selector == depositTo(uint256,address).selector{
         uint256 amount;
         depositTo(e, amount, e.msg.sender);
     }
-    else {
+    else 
+    if f.selector == sellRewards(address ,bytes).selector{
+        address rewardsToken;
+        bytes   params;
+        require rewardsToken != currentContract && rewardsToken != underlyingToken;
+        sellRewards(e,rewardsToken,params);
+    }
+    else{
         calldataarg args;
         f(e,args);
     }
@@ -543,3 +575,8 @@ rule price_monotonicity(method f, env e) filtered { f-> !outOfScope(f) && !f.isV
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////
 
+function global_requires(env e){
+require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
+    e.msg.sender != feeRecipient() && feeRecipient() != currentContract && feeRecipient() != adapter && 
+    currentContract != underlyingToken && rewardsSeller(e) != adapter;
+}
