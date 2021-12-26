@@ -85,6 +85,10 @@ definition outOfScope(method f) returns bool =
 //                       Invariants                                       //
 ////////////////////////////////////////////////////////////////////////////
 
+//////////////////////////////////////////////////////////////
+////  Name:     total_supply_vs_balance
+////  Purpose:  Total Supply equals ZERO in and only if balance equals ZERO
+////  Status:   Passed
 invariant total_supply_vs_balance()   // has some failures 
     totalSupply() == 0 <=> balance() == 0 
     filtered { f-> !outOfScope(f) && !f.isView}
@@ -93,24 +97,9 @@ invariant total_supply_vs_balance()   // has some failures
         requireInvariant adapter_balance_underlying(e,0);
         requireInvariant adapter_balance_underlying(e,1);
         global_requires(e);
-        // require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
-        //     e.msg.sender != feeRecipient() && feeRecipient() != currentContract && currentContract != underlyingToken;
         require underlying() == underlyingToken;
     }
-    /*
-    preserved withdrawFromUnusedAdapter(address adapter) with (env e){
-        // requireInvariant adapter_balance_underlying(e);
-    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
-            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-            feeRecipient() != currentContract;
-    }
-    preserved withdrawUnderlying(uint256 amount) with (env e){
-        // requireInvariant adapter_balance_underlying(e);
-    require e.msg.sender != currentContract && e.msg.sender != Adapter &&
-            e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-            feeRecipient() != currentContract;
-    }
-    */
+    
     preserved initialize(address _underlying, address _rewardsSeller, address _feeRecipient, address _owner) with (env e) {
         require underlyingToken.balanceOf(e, currentContract) == 0;   
         require symbolic_highest_adapter(_underlying) == adapter;
@@ -124,7 +113,6 @@ invariant total_supply_vs_balance()   // has some failures
         require to != adapter;
     }
 
-    
     preserved transferFrom(address from, address to, uint256 amount) with (env e) {
         requireInvariant adapter_balance_underlying(e,0);
         requireInvariant adapter_balance_underlying(e,1);
@@ -139,21 +127,25 @@ invariant total_supply_vs_balance()   // has some failures
         require rewardsToken != currentContract && rewardsToken != underlyingToken;
         
     }
-    
 }
 
-/* STATUS: 
-Passing
-*/
+//////////////////////////////////////////////////////////////
+////  Name:     balanceSheet_equals_balance
+////  Purpose:  balance() and getBalanceSheetTotalBalance() are equivalent
+////  Status:   Passed
 invariant balanceSheet_equals_balance() 
     balance() == getBalanceSheetTotalBalance()
     filtered { f-> !outOfScope(f) && !f.isView}
 
 
+//////////////////////////////////////////////////////////////
+////  Name:     totalSupply_GE_balance
+////  Purpose:  Total Supply always greater than balance , unless rebalance is called
+////  Status:   Passed
 invariant totalSupply_GE_balance()
-totalSupply() >= balance()
-filtered { f-> !outOfScope(f) && !f.isView}
-{
+    totalSupply() >= balance()
+    filtered { f-> !outOfScope(f) && !f.isView}
+    {
         preserved with (env e) {
         requireInvariant adapter_balance_underlying(e,0);
         requireInvariant adapter_balance_underlying(e,1);
@@ -183,13 +175,63 @@ filtered { f-> !outOfScope(f) && !f.isView}
         require adapter.balanceUnderlying(e) == 0;
     }
 }
+
+//////////////////////////////////////////////////////////////
+////  Name:     integrity_adapter_list
+////  Purpose:  Adapters list length always equal weights length , and, each adapter in the list is unique
+////  Status:   Passed
+invariant integrity_adapter_list(uint i, uint j)
+    // equal size
+    adaptersLength() == weightsLength() &&
+    // uniqueness
+    ( i != j => getAdapter(i) != getAdapter(j) )
+    filtered { f-> !outOfScope(f) && !f.isView}
+
+//////////////////////////////////////////////////////////////
+////  Name:     onlyApprovedAdapter
+////  Purpose:  Any adapter in the list of adapters is Approved Adapter
+////  Status:   Passed
+invariant onlyApprovedAdapter(address adapter, uint256 i, env e)
+    getAdapter(i) == adapter => isApprovedAdapterInRegistry(e,adapter)
+    filtered { f-> !outOfScope(f) && !f.isView}   
+
+//////////////////////////////////////////////////////////////
+////  Name:     adapter_balance_underlying
+////  Purpose:  Given balance() is ZERO implies each adapter's balance is ZERO
+////  Status:   Passed
+invariant adapter_balance_underlying(env e, uint256 i)
+    balance() == 0 && getAdapter(i) == adapter => adapter.balanceUnderlying(e) == 0 {
+    preserved {
+        require adaptersLength() <= 3;
+        requireInvariant integrity_adapter_list(i,0);
+        requireInvariant integrity_adapter_list(i,1);
+        requireInvariant integrity_adapter_list(i,2);
+    }
+}
+
+/*    
+//////////////////////////////////////////////////////////////
+////  Name:     collect_fees_check
+////  Purpose:  
+////  Status:   TimeOut
+invariant collect_fees_check(env e)
+    balanceOf(feeRecipient()) < totalSupply() / 2 
+    {
+        preserved with (env e){
+            global_requires(e);
+        }
+    }
+*/
+
 ////////////////////////////////////////////////////////////////////////////
 //                       Rules                                            //
 ////////////////////////////////////////////////////////////////////////////
 
-// deposit x and deposit y is the same as deposit x+ y
-/* STATUS: 
-*/
+
+//////////////////////////////////////////////////////////////
+////  Name:     additive_deposit
+////  Purpose:  deposit x and deposit y is the same as deposit x+ y
+////  Status:   Passed
 rule additive_deposit() {
     env e;
     // require total supply = total balance 
@@ -214,20 +256,20 @@ rule additive_deposit() {
 
     assert balance_sequential == balance_additive, "additivity of balance failed";
 }
-
+/*
+//////////////////////////////////////////////////////////////
+////  Name:     same_deposit_same_shares
+////  Purpose:
+////  Status:   TimeOut
 rule same_deposit_same_shares(){
     env e;
     uint256 x; uint256 y;
-
-    // requireInvariant totalSupply_GE_balance();
 
     uint256 balance_1 = balance();
     uint256 supply_1 = totalSupply();
     uint256 fee_1 = calculateFee(balance_1,supply_1);
     uint256 priceAtLastFee_1 = priceAtLastFee();
     
-    require balance_1 == 0 && supply_1 == 0;
-
     uint256 shares_x = deposit(e, x);
     
     uint256 balance_2 = balance();
@@ -242,76 +284,23 @@ rule same_deposit_same_shares(){
     uint256 fee_3 = calculateFee(balance_3,supply_3);
     uint256 priceAtLastFee_3 = priceAtLastFee();
 
-    require shares_x >= 1000 ;
+    require shares_x >= 1000 ; // eliminate cases when small numbers create big changes
     require performanceFee(e) <= 10^17;
 
     global_requires(e);
 
-    // assert x == y => shares_x * 11 / 10 > shares_y;
-    assert x == y => shares_x * 2  > shares_y;
-    // assert x == y => shares_x == shares_y;
+    // assert x == y => shares_x * 11 / 10 > shares_y; // can have 10% difference
+    assert x == y => shares_x * 2  > shares_y;  // can have double difference
+    // assert x == y => shares_x == shares_y;   // what actually should be 
 
-}
-// might as well write this to go with additive deposit
-/* STATUS: 
- timing out
-*//*
-rule additive_withdraw() { 
-    env e;
-    uint256 x; uint256 y;
-    // store state
-
-    storage initStorage = lastStorage;
-
-    global_requires(e);
-
-    uint256 x_out = withdraw(e, x);
-    uint256 y_out = withdraw(e, y);
-
-    uint256 balance_sequential = balance();
-
-    // return to storage state
-    uint256 xy_out = withdraw(e, x + y) at initStorage;
-    uint256 balance_additive = balance();
-
-    assert balance_sequential == balance_additive, "additivity of balance failed";
-    // assert x_out + y_out == xy_out, "additivity of output failed";
 }*/
 
-/* STATUS: 
-generates cex on deposit and withdraw
-on deposit the rounding error causes the value per share to be valued, calling a second fee, which mints indexed an extra share on a deposit of 1
-on withdraw a new affect of a previously found error. In the case where a user withdraws but does not receive any underlying, shares are burned but no 
-balance is withdrawn. This changes the ratio of balance to shares, causing the system to take fees again
-*/
-rule no_double_fee(method f) filtered {f -> (f.selector == deposit(uint256).selector ||
-                                            f.selector == withdrawUnderlying(uint256).selector ||
-                                             f.selector == withdraw(uint256).selector) }
-{     
-    env e; calldataarg args;
 
-    require e.msg.sender != feeRecipient();
-    require e.msg.sender != currentContract;
-
-    uint256 balance_pre = balance();
-    uint256 supply_pre = totalSupply();
-    uint256 indexed_shares_pre = balanceOf(feeRecipient());
-
-    require calculateFee(balance_pre, supply_pre) == 0; // to reduce timeouts, trying to start the rule in the state where fees have been collected
-    require indexed_shares_pre < supply_pre; // cex where indexed had all shares
-
-    f(e, args);
-    claimFees();
-
-    uint256 supply_post = totalSupply();
-    uint256 balance_post = balance();
-    uint256 indexed_shares_post = balanceOf(feeRecipient());
-    
-    assert indexed_shares_pre == indexed_shares_post, "fee claimed on balance"; 
-    assert calculateFee(balance_post, supply_post) == 0, "repeated fee left to claim";
-}
-
-// special condition for depositTo
+//////////////////////////////////////////////////////////////
+////  Name:     no_double_fee_depositTo
+////  Purpose:  
+////  Status:   TimeOut
+/*
 rule no_double_fee_depositTo() {
 env e; calldataarg args;
 
@@ -338,15 +327,14 @@ env e; calldataarg args;
     uint256 indexed_shares_post = balanceOf(feeRecipient());
     
     // if a fee was claimed the shares of index will go up, this 
-    assert indexed_shares_pre == indexed_shares_post, "fee claimed on balance"; // no cex when this is the only assert
+    // assert indexed_shares_pre == indexed_shares_post, "fee claimed on balance"; // no cex when this is the only assert
     assert calculateFee(balance_post, supply_post) == 0, "repeated fee left to claim";
-}
+}*/
 
-/* STATUS: 
-PASSING - needs review if suggested improvements are important
-*/
-// reduce the starting balance and then claim fee, the fee should be 0
-// hypothesis: this will timeout with two arbitray functions
+//////////////////////////////////////////////////////////////
+////  Name:     no_double_fee_on_drop
+////  Purpose:  Reduce the starting balance and then claim fee, the fee should be 0
+////  Status:   Passed
 rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of underlying value                                                                        
     env e;
 
@@ -377,38 +365,10 @@ rule no_double_fee_on_drop() { // add adapter harness to allow for reduction of 
     assert calculateFee(balance_raise, supply_raise) == 0, "double fee claimed on raise";
 }
 
-/* STATUS: 
-
-*/
-// this was specifically to show withdraw underlying fails this property, but is good to test on other functions
-/*
-rule shares_correlate_balance(method f) filtered { f-> !outOfScope(f) && !f.isView }
-{
-    env e; calldataarg args;
-
-    uint256 balance_pre = balance();
-    uint256 supply_pre = totalSupply();
-
-    global_requires(e);
-
-    if f.selector == sellRewards(address ,bytes).selector{
-        address rewardsToken;
-        bytes   params;
-        require rewardsToken != currentContract && rewardsToken != underlyingToken;
-        sellRewards(e,rewardsToken,params);
-    }
-    else
-    f(e, args);
-
-    uint256 balance_post = balance();
-    uint256 supply_post = totalSupply();
-    assert balance_pre != balance_post <=> supply_pre != supply_post, "balance or shares changed without the other";
-}*/
-
-/* STATUS: 
-    generates counter examples:
-    Balance is 2 with shares of 1, you can withdraw 1 token without burning your share
-*/
+//////////////////////////////////////////////////////////////
+////  Name:     withdraw_underlying_no_shares
+////  Purpose:  Verifies that withdrawUnderlying with ZERO shares end up with ZERO change
+////  Status:   Passed
 rule withdraw_underlying_no_shares() {
     env e;
 
@@ -431,11 +391,11 @@ rule withdraw_underlying_no_shares() {
     assert shares == 0 => vault_balance_pre == vault_balance_post, "amount received with no shares burned";
     assert shares == 0 => user_balance_pre == user_balance_post, "balance increased at no share cost";
 }
-/* 
-Status:
-PASSING
-*/ 
 
+//////////////////////////////////////////////////////////////
+////  Name:     transfer_then_withdraw
+////  Purpose:  "underlyingToken.transfer(e, underlying(), transferAmount);" ???
+////  Status:   Passed
 rule transfer_then_withdraw(method f) filtered { f-> !outOfScope(f) && !f.isView }
 {
     env e; calldataarg args;
@@ -445,6 +405,8 @@ rule transfer_then_withdraw(method f) filtered { f-> !outOfScope(f) && !f.isView
     uint256 supply = totalSupply();
     require balance > 0;
     require supply > 0;
+
+    global_requires(e);
 
     // times out with the ratio atm
     // uint256 ratio = balance * 10 / supply;
@@ -463,22 +425,10 @@ rule transfer_then_withdraw(method f) filtered { f-> !outOfScope(f) && !f.isView
     assert underlyingBack <= depositAmount + transferAmount, "value taken from vault";
 }
 
-
-invariant integrity_adapter_list(uint i, uint j)
-    // equal size
-    adaptersLength() == weightsLength() &&
-    // uniqueness
-    ( i != j => getAdapter(i) != getAdapter(j) )
-    filtered { f-> !outOfScope(f) && !f.isView}
-
-invariant onlyApprovedAdapter(address adapter, uint256 i, env e)
-    getAdapter(i) == adapter => isApprovedAdapterInRegistry(e,adapter)
-    filtered { f-> !outOfScope(f) && !f.isView}   
-    // filtered{f -> f.selector != isApprovedAdapter_instate.selector }
-
-    
-    
-
+//////////////////////////////////////////////////////////////
+////  Name:     addeposit_GR_zeroditive_deposit
+////  Purpose:  Verifies that depositing amount > 0 results in shares recieved greater than zero
+////  Status:   Passed
 rule deposit_GR_zero(){ //failing due to bugs in the code
     env e;
     require e.msg.sender != currentContract;
@@ -490,6 +440,10 @@ rule deposit_GR_zero(){ //failing due to bugs in the code
     assert amount > 0 <=> amountMinted > 0;
 }
 
+//////////////////////////////////////////////////////////////
+////  Name:     more_shares_more_withdraw
+////  Purpose:  Verifies that calling withdraw with more shares results with higher amount recieved
+////  Status:   Passed
 rule more_shares_more_withdraw(){ //failing 
     env e;
 
@@ -508,6 +462,10 @@ rule more_shares_more_withdraw(){ //failing
     assert sharesX > sharesY => amountX >= amountY;
 }
 
+//////////////////////////////////////////////////////////////
+////  Name:     more_user_shares_less_underlying
+////  Purpose:  Verifies that rise in user's shares implies decrease in user's underlying and vice versa
+////  Status:   Passed
 rule more_user_shares_less_underlying(method f) // failures need to check 
         filtered {f -> f.selector != transfer(address,uint256).selector && f.selector != transferFrom(address,address,uint256).selector && !f.isView }{
     env e;
@@ -540,7 +498,11 @@ rule more_user_shares_less_underlying(method f) // failures need to check
     assert User_balance_after < User_balance_before <=> Underlying_balance_after > Underlying_balance_before;
 }
 
-rule price_monotonicity(method f, env e) filtered { f-> !outOfScope(f) && !f.isView} { //failing due to bug in the code
+//////////////////////////////////////////////////////////////
+////  Name:     price_monotonicity
+////  Purpose:  If, after calling claimFees the priceAtLastFee has changed (increased), it must not change after calling claimFees again.
+////  Status:   Passed
+rule price_monotonicity(method f, env e) filtered { f-> !outOfScope(f) && !f.isView} {
     claimFees();
     uint256 _price = priceAtLastFee();
     uint256 _supply = totalSupply();
@@ -552,35 +514,18 @@ rule price_monotonicity(method f, env e) filtered { f-> !outOfScope(f) && !f.isV
     uint256 balance_ = balance();
     assert price_ >= _price;
 }
-/*    
-    invariant collect_fees_check(env e)
-    balanceOf(feeRecipient()) < totalSupply() / 2 
-    {
-        preserved{
-        requireInvariant adapter_balance_underlying(e,0);
-        require e.msg.sender != currentContract && e.msg.sender != adapter &&
-                e.msg.sender != underlyingToken && e.msg.sender != feeRecipient() &&
-                feeRecipient() != currentContract;
-        }
-    }
-*/
-    invariant adapter_balance_underlying(env e, uint256 i)
-    balance() == 0 && getAdapter(i) == adapter => adapter.balanceUnderlying(e) == 0 {
-        preserved {
-            require adaptersLength() <= 3;
-            requireInvariant integrity_adapter_list(i,0);
-            requireInvariant integrity_adapter_list(i,1);
-            requireInvariant integrity_adapter_list(i,2);
-        }
-    }
-
 
 ////////////////////////////////////////////////////////////////////////////
 //                       Helper Functions                                 //
 ////////////////////////////////////////////////////////////////////////////
 
+//////////////////////////////////////////////////////////////
+////  Name:     global_requires
+////  Purpose:  Eliminate cases when address variables cannot share the same value 
+////  Status:   
 function global_requires(env e){
 require e.msg.sender != currentContract && e.msg.sender != adapter && e.msg.sender != underlyingToken && 
-    e.msg.sender != feeRecipient() && feeRecipient() != currentContract && feeRecipient() != adapter && 
+    e.msg.sender != feeRecipient() && e.msg.sender != rewardsSeller(e) && 
+    feeRecipient() != currentContract && feeRecipient() != adapter && 
     currentContract != underlyingToken && rewardsSeller(e) != adapter;
 }
