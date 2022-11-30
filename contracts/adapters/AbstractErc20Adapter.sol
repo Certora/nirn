@@ -82,16 +82,16 @@ abstract contract AbstractErc20Adapter {
 
   function deposit(uint256 amountUnderlying) external virtual returns (uint256 amountMinted) {
     require(amountUnderlying > 0, "deposit 0");
-    underlying.safeTransferFrom(msg.sender, address(this), amountUnderlying);
+    IERC20(underlying).transferFrom(msg.sender, address(this), amountUnderlying);
     amountMinted = _mint(amountUnderlying);
-    token.safeTransfer(msg.sender, amountMinted);
+    IERC20(token).transfer(msg.sender, amountMinted);
   }
 
   function withdraw(uint256 amountToken) public virtual returns (uint256 amountReceived) {
     require(amountToken > 0, "withdraw 0");
-    token.safeTransferFrom(msg.sender, address(this), amountToken);
+    IERC20(token).transferFrom(msg.sender, address(this), amountToken);
     amountReceived = _burn(amountToken);
-    underlying.safeTransfer(msg.sender, amountReceived);
+    IERC20(underlying).transfer(msg.sender, amountReceived);
   }
 
   function withdrawAll() public virtual returns (uint256 amountReceived) {
@@ -101,7 +101,7 @@ abstract contract AbstractErc20Adapter {
   function withdrawUnderlying(uint256 amountUnderlying) external virtual returns (uint256 amountBurned) {
     require(amountUnderlying > 0, "withdraw 0");
     amountBurned = _burnUnderlying(amountUnderlying);
-    underlying.safeTransfer(msg.sender, amountUnderlying);
+    IERC20(underlying).transfer(msg.sender, amountUnderlying);
   }
 
   function withdrawUnderlyingUpTo(uint256 amountUnderlying) external virtual returns (uint256 amountReceived) {
@@ -109,7 +109,7 @@ abstract contract AbstractErc20Adapter {
     uint256 amountAvailable = availableLiquidity();
     amountReceived = amountAvailable < amountUnderlying ? amountAvailable : amountUnderlying;
     _burnUnderlying(amountReceived);
-    underlying.safeTransfer(msg.sender, amountReceived);
+    IERC20(underlying).transfer(msg.sender, amountReceived);
   }
 
 /* ========== Internal Actions ========== */

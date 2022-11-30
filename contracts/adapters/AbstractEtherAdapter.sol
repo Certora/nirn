@@ -33,27 +33,27 @@ abstract contract AbstractEtherAdapter is AbstractErc20Adapter {
     override
     returns (uint256 amountMinted)
   {
-    underlying.safeTransferFrom(msg.sender, address(this), amountUnderlying);
+    IERC20(underlying).transferFrom(msg.sender, address(this), amountUnderlying);
     _afterReceiveWETH(amountUnderlying);
     amountMinted = _mint(amountUnderlying);
-    token.safeTransfer(msg.sender, amountMinted);
+    IERC20(token).transfer(msg.sender, amountMinted);
   }
 
   function depositETH() external virtual payable returns (uint256 amountMinted) {
     _afterReceiveETH(msg.value);
     amountMinted = _mint(msg.value);
-    token.safeTransfer(msg.sender, amountMinted);
+    IERC20(token).transfer(msg.sender, amountMinted);
   }
 
   function withdraw(uint256 amountToken) public virtual override returns (uint256 amountReceived) {
-    token.safeTransferFrom(msg.sender, address(this), amountToken);
+    IERC20(token).transferFrom(msg.sender, address(this), amountToken);
     amountReceived = _burn(amountToken);
     _beforeSendWETH(amountReceived);
-    underlying.safeTransfer(msg.sender, amountReceived);
+    IERC20(underlying).transfer(msg.sender, amountReceived);
   }
 
   function withdrawAsETH(uint256 amountToken) public virtual returns (uint256 amountReceived) {
-    token.safeTransferFrom(msg.sender, address(this), amountToken);
+    IERC20(token).transferFrom(msg.sender, address(this), amountToken);
     amountReceived = _burn(amountToken);
     _beforeSendETH(amountReceived);
     address(msg.sender).safeTransferETH(amountReceived);
@@ -66,7 +66,7 @@ abstract contract AbstractEtherAdapter is AbstractErc20Adapter {
   function withdrawUnderlying(uint256 amountUnderlying) external virtual override returns (uint256 amountBurned) {
     amountBurned = _burnUnderlying(amountUnderlying);
     _beforeSendWETH(amountUnderlying);
-    underlying.safeTransfer(msg.sender, amountUnderlying);
+    IERC20(underlying).transfer(msg.sender, amountUnderlying);
   }
 
   function withdrawUnderlyingAsETH(uint256 amountUnderlying) external virtual returns (uint256 amountBurned) {
@@ -81,7 +81,7 @@ abstract contract AbstractEtherAdapter is AbstractErc20Adapter {
     amountReceived = amountAvailable < amountUnderlying ? amountAvailable : amountUnderlying;
     _burnUnderlying(amountReceived);
     _beforeSendWETH(amountReceived);
-    underlying.safeTransfer(msg.sender, amountReceived);
+    IERC20(underlying).transfer(msg.sender, amountReceived);
   }
 
 /* ========== Internal Ether Handlers ========== */

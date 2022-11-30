@@ -2,12 +2,19 @@
 pragma solidity =0.7.6;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "node_modules/@openzeppelin/contracts/access/Ownable.sol";
 import "../libraries/RebalanceValidation.sol";
 import "../libraries/SafeCast.sol";
 import "./NirnVaultBase.sol";
 
-
+/**
+ * CER: Removed dependency on DyamicArrays as it breaks some assumptions of the PTA analysis. 
+ * Length is tracked using additional return values passed and extra variables.
+ * In addition, avoiding packing functions and using pure Solidity.
+ * Need to spec those array functions separately to keep business logic spec simple and easy to verify.
+ *
+ * Also changing safeTransfer* (safeApprove tool) functions to transfer*. This allows running the tool in an easier mode.
+ */
 contract NirnVault is NirnVaultBase {
   using Fraction for uint256;
   using TransferHelper for address;
@@ -57,9 +64,11 @@ contract NirnVault is NirnVaultBase {
     if (max > 0) {
       require(bal.add(amount) <= max, "maximumUnderlying");
     }
-    underlying.safeTransferFrom(msg.sender, address(this), amount);
+    ERC20(underlying).transferFrom(msg.sender, address(this), amount);
     uint256 supply = claimFees(bal, totalSupply);
-    shares = supply == 0 ? amount : amount.mul(supply) / bal;
+    shares = totalSupply == 0 ? amount : amount.mul(totalSupply) / bal;
+    require (shares != 0); // Certora fix
+    require (shares * bal == amount.mul(totalSupply)); // Certora fix
     _mint(to, shares);
     emit Deposit(shares, amount);
   }
@@ -68,7 +77,10 @@ contract NirnVault is NirnVaultBase {
     (IErc20Adapter[] memory adapters, uint256[] memory weights) = getAdaptersAndWeights();
     BalanceSheet memory balanceSheet = getBalanceSheet(adapters);
     uint256 supply = claimFees(balanceSheet.totalBalance, totalSupply);
+    // require( balanceSheet.totalBalance >= totalSupply); Gadi
     amountOut = shares.mul(balanceSheet.totalBalance) / supply;
+    require(amountOut != 0);// Certora Fix
+    require(amountOut * supply == shares * balanceSheet.totalBalance); //Certora fix
     withdrawInternal(
       shares,
       amountOut,
@@ -83,6 +95,8 @@ contract NirnVault is NirnVaultBase {
     BalanceSheet memory balanceSheet = getBalanceSheet(adapters);
     uint256 supply = claimFees(balanceSheet.totalBalance, totalSupply);
     shares = amount.mul(supply) / balanceSheet.totalBalance;
+    require(shares != 0); //Certora Fix
+    require(shares * balanceSheet.totalBalance == amount * supply); // Certora fix
     withdrawInternal(
       shares,
       amount,
@@ -124,7 +138,8 @@ contract NirnVault is NirnVaultBase {
     if (amount > _reserveBalance) {
       uint256 remainder = amount.sub(_reserveBalance);
       uint256 len = balances.length;
-      uint256[] memory removeIndices = DynamicArrays.dynamicUint256Array(len);
+      uint256[] memory removeIndices = new uint256[](len);
+      uint toPush = 0;
       for (uint256 i; i < len; i++) {
         uint256 bal = balances[i];
         if (bal == 0) continue;
@@ -137,12 +152,13 @@ contract NirnVault is NirnVaultBase {
         uint256 amountWithdrawn = adapters[i].withdrawUnderlyingUpTo(amountToWithdraw);
         remainder = remainder >= amountWithdrawn ? remainder - amountWithdrawn : 0;
         if (weights[i] == 0 && amountWithdrawn == bal) {
-          removeIndices.dynamicPush(i);
+          removeIndices[toPush] = i;
+          toPush += 1;
         }
         if (remainder == 0) break;
       }
       require(remainder == 0, "insufficient available balance");
-      removeAdapters(removeIndices);
+      removeAdapters(removeIndices, toPush);
     }
   }
 
@@ -152,13 +168,13 @@ contract NirnVault is NirnVaultBase {
     (IErc20Adapter[] memory adapters, uint256[] memory weights) = getAdaptersAndWeights();
     BalanceSheet memory balanceSheet = getBalanceSheet(adapters);
     int256[] memory liquidityDeltas = AdapterHelper.getLiquidityDeltas(balanceSheet.totalProductiveBalance, balanceSheet.balances, weights);
-    uint256[] memory removedIndices = AdapterHelper.rebalance(
+    (uint256[] memory removedIndices, uint256 len) = AdapterHelper.rebalance(
       adapters,
       weights,
       liquidityDeltas,
       balanceSheet.reserveBalance
     );
-    removeAdapters(removedIndices);
+    removeAdapters(removedIndices, len);
     emit Rebalanced();
   }
 
@@ -175,8 +191,7 @@ contract NirnVault is NirnVaultBase {
     // Validate rebalance results in sufficient APR improvement
     RebalanceValidation.validateSufficientImprovement(params.netAPR, proposedAPR, minimumAPRImprovement);
     // Rebalance and remove adapters with 0 weight which the vault could fully exit.
-    uint256[] memory removedIndices = AdapterHelper.rebalance(params.adapters, proposedWeights, proposedLiquidityDeltas, _reserveBalance);
-    uint256 removeLen = removedIndices.length;
+    (uint256[] memory removedIndices, uint256 removeLen) = AdapterHelper.rebalance(params.adapters, proposedWeights, proposedLiquidityDeltas, _reserveBalance);
     if (removeLen > 0) {
       for (uint256 i = removeLen; i > 0; i--) {
         uint256 rI = removedIndices[i-1];
@@ -185,7 +200,7 @@ contract NirnVault is NirnVaultBase {
         proposedWeights.mremove(rI);
       }
     }
-    setAdaptersAndWeights(params.adapters, proposedWeights);
+    //setAdaptersAndWeights(params.adapters, proposedWeights);
   }
 
   function currentDistribution() public view override returns (
@@ -220,16 +235,15 @@ contract NirnVault is NirnVaultBase {
     IErc20Adapter[] calldata proposedAdapters,
     uint256[] calldata proposedWeights
   ) internal view returns (DistributionParameters memory params) {
-    uint256[] memory excludedAdapterIndices = currentParams.adapters.getExcludedAdapterIndices(proposedAdapters);
-    uint256 proposedSize = proposedAdapters.length;
-    uint256 expandedSize = proposedAdapters.length + excludedAdapterIndices.length;
+    (uint256[] memory excludedAdapterIndices, uint256 excludedLen) = currentParams.adapters.getExcludedAdapterIndices(proposedAdapters);
+    uint256 expandedSize = proposedAdapters.length + excludedLen;
     params.adapters = new IErc20Adapter[](expandedSize);
     params.weights = new uint256[](expandedSize);
     params.balances = new uint256[](expandedSize);
     params.liquidityDeltas = new int256[](expandedSize);
     uint256 i;
-    uint256 netAPR;
-    for (; i < proposedSize; i++) {
+    uint256 netAPR;/*
+    for (; i < proposedAdapters.length; i++) { // CER: had to get rid of proposedSize to avoid a stack too deep error that even optimizer couldn't help against
       IErc20Adapter adapter = proposedAdapters[i];
       params.adapters[i] = adapter;
       uint256 weight = proposedWeights[i];
@@ -246,19 +260,19 @@ contract NirnVault is NirnVaultBase {
     netAPR = netAPR.mulSubFractionE18(reserveRatio);
     RebalanceValidation.validateSufficientImprovement(currentParams.netAPR, netAPR, minimumAPRImprovement);
     for (; i < expandedSize; i++) {
-      // i - proposedSize = index in excluded adapter indices array
+      // i - proposedAdapters.length = index in excluded adapter indices array
       // The value in excludedAdapterIndices is the index in the current adapters array
       // for the adapter which is being removed.
       // The lending markets for these adapters may or may not have sufficient liquidity to
       // process a full withdrawal requested by the vault, so we keep those adapters in the
       // adapters list, but set a weight of 0 and a liquidity delta of -balance
-      uint256 rI = excludedAdapterIndices[i - proposedSize];
+      uint256 rI = excludedAdapterIndices[i - proposedAdapters.length];
       params.adapters[i] = currentParams.adapters[rI];
       params.weights[i] = 0;
       uint256 _balance = currentParams.balances[rI];
       params.balances[i] = _balance;
       params.liquidityDeltas[i] = -_balance.toInt256();
-    }
+    }*/
   }
 
   function rebalanceWithNewAdapters(
@@ -278,13 +292,12 @@ contract NirnVault is NirnVaultBase {
       proposedWeights
     );
     beforeAddAdapters(proposedParams.adapters);
-    uint256[] memory removedIndices = AdapterHelper.rebalance(
+    (uint256[] memory removedIndices, uint256 removedLen) = AdapterHelper.rebalance(
       proposedParams.adapters,
       proposedParams.weights,
       proposedParams.liquidityDeltas,
       _reserveBalance
     );
-    uint256 removedLen = removedIndices.length;
     if (removedLen > 0) {
       // The indices to remove are necessarily in ascending order, so as long as we remove
       // them in reverse, the removal of elements will not break the other indices.
@@ -299,6 +312,23 @@ contract NirnVault is NirnVaultBase {
   }
 
   function _transferOut(address to, uint256 amount) internal {
-    underlying.safeTransfer(to, amount);
+    ERC20(underlying).transfer(to, amount);
+  }
+
+
+
+  // certora helpers 
+  
+  function weightsLength() external view returns (uint256) { return weights_.length; }
+
+  function getWeight(uint i) external view returns (uint256) { return weights_[i]; }
+
+  function getAdapter(uint256 i) external returns(address) {
+  require( i < adapters_.length);
+  return address(adapters_[i]);
+  }
+
+  function isApprovedAdapterInRegistry(address adapter) external returns (bool){
+    return registry.isApprovedAdapter(address(adapter));
   }
 }

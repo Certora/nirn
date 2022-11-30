@@ -5,3 +5,14 @@ typechain/
 .env
 coverage/
 coverage.json
+.certora_build.json
+.certora*
+last_conf*
+.DS_Store
+package-lock.json
+package.json
+package.json
+.gitignore
+.gitignore
+yarn.lock
+contracts/libraries/Ownable.sol

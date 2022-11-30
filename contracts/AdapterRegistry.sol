@@ -47,6 +47,20 @@ contract AdapterRegistry is Ownable(), IAdapterRegistry {
 
   /** @dev List of all underlying tokens with registered adapters. */
   EnumerableSet.AddressSet internal supportedTokens;
+ 
+/* ========== Harness ============ */
+ 
+function vaultsContains(address vault) external view returns (bool) {
+    return vaults.contains(vault);
+}
+
+function isProtocolOrOwner(address ad) external view returns (bool) {
+  return protocolAdapterIds[ad] > 0 || ad == owner();
+}
+
+function getVaultUnderlying(address vault) external view returns (address) {
+  return INirnVault(vault).underlying();
+}
 
 /* ========== Modifiers ========== */
 
@@ -243,7 +257,7 @@ contract AdapterRegistry is Ownable(), IAdapterRegistry {
       try IErc20Adapter(adapters[i]).getAPR() returns (uint256 apr) {
         aprs[i] = apr;
       } catch {
-        aprs[i] = 0;
+      aprs[i] = 0;
       }
     }
     adapters.sortByDescendingScore(aprs);

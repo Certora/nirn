@@ -138,10 +138,11 @@ library AdapterHelper {
   function getExcludedAdapterIndices(
     IErc20Adapter[] memory oldAdapters,
     IErc20Adapter[] memory newAdapters
-  ) internal pure returns (uint256[] memory excludedAdapterIndices) {
+  ) internal pure returns (uint256[] memory excludedAdapterIndices, uint256 lenExcluded) {
     uint256 selfLen = oldAdapters.length;
     uint256 otherLen = newAdapters.length;
-    excludedAdapterIndices = DynamicArrays.dynamicUint256Array(selfLen);
+    excludedAdapterIndices = new uint256[](selfLen);
+    lenExcluded = 0;
     for (uint256 i; i < selfLen; i++) {
       IErc20Adapter element = oldAdapters[i];
       for (uint256 j; j < otherLen; j++) {
@@ -151,7 +152,8 @@ library AdapterHelper {
         }
       }
       if (element != IErc20Adapter(0)) {
-        excludedAdapterIndices.dynamicPush(i);
+        excludedAdapterIndices[lenExcluded] = i;
+        lenExcluded += 1;
       }
     }
   }
@@ -173,9 +175,10 @@ library AdapterHelper {
     uint256[] memory weights,
     int256[] memory liquidityDeltas,
     uint256 reserveBalance
-  ) internal returns (uint256[] memory removedIndices) {
+  ) internal returns (uint256[] memory removedIndices, uint256 lenRemovedIndices) {
     uint256 len = liquidityDeltas.length;
-    removedIndices = DynamicArrays.dynamicUint256Array(len);
+    removedIndices = new uint256[](len);
+    uint256 lenRemovedIndices = 0;
     uint256 totalAvailableBalance = reserveBalance;
     // Execute withdrawals first
     for (uint256 i; i < len; i++) {
@@ -188,7 +191,8 @@ library AdapterHelper {
         // the full balance, it will mark the index of the adapter as able to be removed
         // so that it can be deleted by the rebalance function.
         if (weights[i] == 0 && amountWithdrawn == amountToWithdraw) {
-          removedIndices.dynamicPush(i);
+          removedIndices[lenRemovedIndices] = i;
+          lenRemovedIndices += 1; //.dynamicPush(i);
         }
         totalAvailableBalance = totalAvailableBalance.add(amountWithdrawn);
       }

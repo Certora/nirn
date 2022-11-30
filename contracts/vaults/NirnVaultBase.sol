@@ -88,7 +88,18 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
   uint128 public override priceAtLastFee;
 
   /** @dev Tightly packed token adapters encoded as (address,uint96). */
-  bytes32[] internal packedAdaptersAndWeights;
+  //bytes32[] internal packedAdaptersAndWeights;
+
+  IErc20Adapter[] internal adapters_;
+  uint256[] internal weights_;
+
+  function adaptersLength() external view returns (uint256) { return adapters_.length; }
+
+  // harness function
+  function getBalanceSheetTotalBalance() external view returns (uint256) { 
+    (IErc20Adapter[] memory adapters, uint256[] memory weights) = getAdaptersAndWeights();
+    return getBalanceSheet(adapters).totalBalance; 
+  }
 
   /** @dev ERC20 decimals */
   function decimals() external view override returns (uint8) {
@@ -103,25 +114,27 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     IErc20Adapter[] memory adapters,
     uint256[] memory weights
   ) {
-    (adapters, weights) = packedAdaptersAndWeights.unpackAdaptersAndWeights();
+    (adapters, weights) = (adapters_, weights_); // packedAdaptersAndWeights.unpackAdaptersAndWeights();
   }
 
   function setAdaptersAndWeights(IErc20Adapter[] memory adapters, uint256[] memory weights) internal {
-    emit AllocationsUpdated(adapters, weights);
+    //emit AllocationsUpdated(adapters, weights);
+    adapters_ = adapters;
+    weights_ = weights;
+    /*
     packedAdaptersAndWeights = AdapterHelper.packAdaptersAndWeights(
       adapters,
       weights
-    );
+    );*/
   }
 
-  function removeAdapters(uint256[] memory removeIndices) internal {
-    uint256 len = removeIndices.length;
+  function removeAdapters(uint256[] memory removeIndices, uint256 len) internal {
     if (len == 0) return;
     for (uint256 i = len; i > 0; i--) {
       uint256 rI = removeIndices[i - 1];
-      (IErc20Adapter adapter,) = packedAdaptersAndWeights[rI].unpackAdapterAndWeight();
+      IErc20Adapter adapter = adapters_[rI]; // packedAdaptersAndWeights[rI].unpackAdapterAndWeight();
       emit AdapterRemoved(adapter);
-      packedAdaptersAndWeights.remove(rI);
+      adapters_.remove(rI); weights_.remove(rI); //packedAdaptersAndWeights.remove(rI);
     }
   }
 
@@ -169,11 +182,11 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     rewardsSeller = IRewardsSeller(_rewardsSeller);
 
     (address adapter,) = registry.getAdapterWithHighestAPR(_underlying);
-    packedAdaptersAndWeights.push(AdapterHelper.packAdapterAndWeight(IErc20Adapter(adapter), 1e18));
+    adapters_.push(IErc20Adapter(adapter)); weights_.push(1e18); //packedAdaptersAndWeights.push(AdapterHelper.packAdapterAndWeight(IErc20Adapter(adapter), 1e18));
     beforeAddAdapter(IErc20Adapter(adapter));
 
-    name = SymbolHelper.getPrefixedName("Indexed ", _underlying);
-    symbol = SymbolHelper.getPrefixedSymbol("n", _underlying);
+    // name = SymbolHelper.getPrefixedName("Indexed ", _underlying);
+    // symbol = SymbolHelper.getPrefixedSymbol("n", _underlying);
     performanceFee = 1e17;
     reserveRatio = 1e17;
     priceAtLastFee = 1e18;
@@ -217,8 +230,8 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     require(!lockedTokens[rewardsToken] && rewardsToken != underlying, "token locked");
     IRewardsSeller _rewardsSeller = rewardsSeller;
     require(address(_rewardsSeller) != address(0), "null seller");
-    rewardsToken.safeTransfer(address(_rewardsSeller), _balance);
-    _rewardsSeller.sellRewards(msg.sender, rewardsToken, underlying, params);
+    ERC20(rewardsToken).transfer(address(_rewardsSeller), _balance);
+    // _rewardsSeller.sellRewards(msg.sender, rewardsToken, underlying, params);
   }
 
   function withdrawFromUnusedAdapter(IErc20Adapter adapter) external {
@@ -229,10 +242,10 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     );
     require(registry.isApprovedAdapter(address(adapter)), "!approved");
     address wrapper = adapter.token();
-    wrapper.safeApproveMax(address(adapter));
+    ERC20(wrapper).approve(address(adapter), type(uint256).max); //.safeApproveMax(address(adapter));
     uint256 bal = adapter.balanceUnderlying();
     adapter.withdrawUnderlyingUpTo(bal);
-    wrapper.safeUnapprove(address(adapter));
+    ERC20(wrapper).approve(address(adapter), 0); //safeUnapprove(address(adapter));
   }
 
 /* ========== Underlying Balance Queries ========== */
@@ -282,8 +295,8 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
   }
 
 /* ========== Fees ========== */
-
-  function calculateFee(uint256 totalBalance, uint256 supply) internal view returns (uint256) {
+// harnessed to be public
+  function calculateFee(uint256 totalBalance, uint256 supply) public view returns (uint256) {
     uint256 valueAtLastCollectionPrice = supply.mulFractionE18(priceAtLastFee);
     if (totalBalance <= valueAtLastCollectionPrice) return 0;
     uint256 profit = totalBalance.sub(valueAtLastCollectionPrice);
@@ -295,13 +308,16 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
   }
 
   function claimFees(uint256 totalBalance, uint256 supply) internal returns (uint256 newSupply) {
+    if(priceAtLastFee != 0){
     uint256 totalFees = calculateFee(totalBalance, supply);
     if (totalFees == 0) return supply;
     uint256 equivalentShares = totalFees.mul(supply) / totalBalance.sub(totalFees);
     emit FeesClaimed(totalFees, equivalentShares);
     _mint(feeRecipient, equivalentShares);
-    newSupply = supply.add(equivalentShares);
-    priceAtLastFee = totalBalance.toFractionE18(newSupply).toUint128();
+    newSupply = totalSupply; //Gadi supply.add(equivalentShares);
+    }
+    // require (priceAtLastFee < totalBalance.toFractionE18(newSupply).toUint128()); //Gadi
+    priceAtLastFee = totalBalance.toFractionE18(supply).toUint128();
   }
 
   function claimFees() external {
@@ -331,8 +347,8 @@ abstract contract NirnVaultBase is ERC20, OwnableProxyImplementation(), INirnVau
     address wrapper = adapter.token();
     if (IERC20(wrapper).allowance(address(this), address(adapter)) > 0) return;
     lockedTokens[wrapper] = true;
-    underlying.safeApproveMax(address(adapter));
-    wrapper.safeApproveMax(address(adapter));
+    ERC20(underlying).approve(address(adapter), type(uint256).max); //.safeApproveMax(address(adapter));
+    ERC20(wrapper).approve(address(adapter), type(uint256).max); //.safeApproveMax(address(adapter));
   }
 
   function beforeAddAdapters(IErc20Adapter[] memory adapters) internal {
